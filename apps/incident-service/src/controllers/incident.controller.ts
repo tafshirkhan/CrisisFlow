@@ -5,13 +5,19 @@ import {
   createIncident,
   listIncidents,
   getIncidentById,
+  updateIncidentStatus,
+  IncidentNotFoundError,
+  InvalidStatusTransitionError,
+  IncidentStatusConflictError,
 } from '../services/incident.service.js';
 
 import type {
   CreateIncidentBody,
   ListIncidentsQuery,
+  UpdateIncidentStatusBody,
 } from '../types/incident.types.js';
 
+//POST
 export const createIncidentHandler = async (
   request: FastifyRequest<{ Body: CreateIncidentBody }>,
   reply: FastifyReply,
@@ -32,6 +38,7 @@ export const createIncidentHandler = async (
   }
 };
 
+//GETALL
 export const listIncidentsHandler = async (
   request: FastifyRequest<{ Querystring: ListIncidentsQuery }>,
   reply: FastifyReply,
@@ -50,6 +57,7 @@ export const listIncidentsHandler = async (
 };
 
 
+//GETBYID
 export const getIncidentByIdHandler = async (
   request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,
@@ -75,5 +83,49 @@ export const getIncidentByIdHandler = async (
   }
 };
 
+//PATCH
+export const updateIncidentStatusHandler = async (
+  request: FastifyRequest<{
+    Params: { id: string };
+    Body: UpdateIncidentStatusBody;
+  }>,
+  reply: FastifyReply,
+) => {
+  try {
+    const incident = await updateIncidentStatus(
+      request.params.id,
+      request.body.status,
+    );
 
+    return reply.code(200).send({
+      message: 'Incident status updated successfully',
+      data: incident,
+    });
+  } catch (error) {
+    if (error instanceof IncidentNotFoundError) {
+      return reply.code(404).send({
+        message: 'Incident not found',
+      });
+    }
 
+    if (error instanceof InvalidStatusTransitionError) {
+      return reply.code(422).send({
+        message: error.message,
+        currentStatus: error.currentStatus,
+        requestedStatus: error.requestedStatus,
+      });
+    }
+
+    if (error instanceof IncidentStatusConflictError) {
+      return reply.code(409).send({
+        message: error.message,
+      });
+    }
+
+    request.log.error(error, 'Failed to update incident status');
+
+    return reply.code(500).send({
+      message: 'Unable to update incident status',
+    });
+  }
+};

@@ -8,6 +8,7 @@ import type {
   ListIncidentsQuery,
 } from '../types/incident.types.js';
 
+//Post a incident
 export const createIncident = async (
   referenceNumber: string,
   incident: CreateIncidentBody,
@@ -50,6 +51,7 @@ export const createIncident = async (
   return result.rows[0];
 };
 
+//Get all the incidents
 export const listIncidents = async (
   query: ListIncidentsQuery,
 ) => {
@@ -117,7 +119,7 @@ export const listIncidents = async (
 };
 
 
-
+//Get specefic incident
 export const findIncidentById = async (id: string) => {
   const result = await pool.query(
     `SELECT
@@ -136,6 +138,41 @@ export const findIncidentById = async (id: string) => {
      FROM incidents
      WHERE id = $1`,
     [id],
+  );
+
+  return result.rows[0] ?? null;
+};
+
+
+//Update Incident Status
+// Why expectedStatus? The SQL updates the incident only if its status still matches the status we previously read.
+//if two dispatchers try to update the same incident simultaneously, this condition helps prevent the second update from silently overwriting a change made by the first
+
+export const updateIncidentStatus = async (
+  id: string,
+  expectedStatus: string,
+  newStatus: string,
+) => {
+  const result = await pool.query(
+    `UPDATE incidents
+     SET status = $3,
+         updated_at = NOW()
+     WHERE id = $1
+       AND status = $2
+     RETURNING
+       id,
+       reference_number,
+       type,
+       description,
+       priority,
+       status,
+       latitude,
+       longitude,
+       address,
+       reported_by,
+       created_at,
+       updated_at`,
+    [id, expectedStatus, newStatus],
   );
 
   return result.rows[0] ?? null;

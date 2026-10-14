@@ -25,3 +25,8 @@ export interface ListIncidentsQuery {
   limit?: number;
   offset?: number;
 }
+
+
+export interface UpdateIncidentStatusBody {
+  status: IncidentStatus;
+}

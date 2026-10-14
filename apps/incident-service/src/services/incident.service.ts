@@ -1,5 +1,5 @@
 // createIncident() generates the incident reference and delegates persistence to the repository.
-// listIncidents() delegates incident retrieval to the repository.
+// listIncidents()  incident retrieval to the repository.
 // The service doesn't know about HTTP status codes or Fastify's request and reply objects.
 
 import { randomUUID } from 'node:crypto';
@@ -8,11 +8,15 @@ import {
   createIncident as createIncidentRecord,
   listIncidents as listIncidentRecords,
   findIncidentById as findIncidentRecordById,
+  updateIncidentStatus as updateIncidentStatusRecord,
 } from '../repositories/incident.repository.js';
+
+import { INCIDENT_STATUS_TRANSITIONS } from '../constants/incident-transitions.constants.js';
 
 import type {
   CreateIncidentBody,
   ListIncidentsQuery,
+  IncidentStatus,
 } from '../types/incident.types.js';
 
 export const createIncident = async (
@@ -32,4 +36,70 @@ export const listIncidents = async (
 
 export const getIncidentById = async (id: string) => {
   return findIncidentRecordById(id);
+};
+
+export class IncidentNotFoundError extends Error {
+  constructor() {
+    super('Incident not found');
+    this.name = 'IncidentNotFoundError';
+  }
+}
+
+export class InvalidStatusTransitionError extends Error {
+  constructor(
+    public readonly currentStatus: IncidentStatus,
+    public readonly requestedStatus: IncidentStatus,
+  ) {
+    super(
+      `Cannot transition incident from ${currentStatus} to ${requestedStatus}`,
+    );
+    this.name = 'InvalidStatusTransitionError';
+  }
+}
+
+export class IncidentStatusConflictError extends Error {
+  constructor() {
+    super('Incident status changed concurrently. Please retry.');
+    this.name = 'IncidentStatusConflictError';
+  }
+}
+
+export const updateIncidentStatus = async (
+  id: string,
+  requestedStatus: IncidentStatus,
+) => {
+  const incident = await findIncidentRecordById(id);
+
+  if (!incident) {
+    throw new IncidentNotFoundError();
+  }
+
+  const currentStatus = incident.status as IncidentStatus;
+
+  // Treat a request for the current status
+  if (currentStatus === requestedStatus) {
+    return incident;
+  }
+
+  const allowedTransitions =
+    INCIDENT_STATUS_TRANSITIONS[currentStatus];
+
+  if (!allowedTransitions.includes(requestedStatus)) {
+    throw new InvalidStatusTransitionError(
+      currentStatus,
+      requestedStatus,
+    );
+  }
+
+  const updatedIncident = await updateIncidentStatusRecord(
+    id,
+    currentStatus,
+    requestedStatus,
+  );
+
+  if (!updatedIncident) {
+    throw new IncidentStatusConflictError();
+  }
+
+  return updatedIncident;
 };
