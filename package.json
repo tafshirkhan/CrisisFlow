@@ -1,0 +1,15 @@
+
+
+{
+  "name": "crisisflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scalable Event-Driven Emergency Response and Resource Coordination Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:incident": "npm run dev --workspace=@crisisflow/incident-service"
+  }
+}

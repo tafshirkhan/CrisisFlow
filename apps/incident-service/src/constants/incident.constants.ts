@@ -1,0 +1,33 @@
+export const INCIDENT_TYPES = [
+  'MEDICAL',
+  'FIRE',
+  'ROAD_ACCIDENT',
+  'PUBLIC_SAFETY',
+  'FLOOD',
+  'HAZARDOUS_MATERIAL',
+  'MISSING_PERSON',
+  'INFRASTRUCTURE_EMERGENCY',
+  'OTHER',
+] as const;
+
+export const INCIDENT_STATUSES = [
+  'REPORTED',
+  'RECEIVED',
+  'UNDER_REVIEW',
+  'VERIFIED',
+  'REJECTED',
+  'PRIORITISED',
+  'DISPATCHING',
+  'ASSIGNED',
+  'RESOLVED',
+  'CLOSED',
+  'CANCELLED',
+  'DUPLICATE',
+] as const;
+
+export const INCIDENT_PRIORITIES = [
+  'CRITICAL',
+  'HIGH',
+  'MEDIUM',
+  'LOW',
+] as const;
