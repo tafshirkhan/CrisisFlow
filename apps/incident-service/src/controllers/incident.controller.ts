@@ -16,6 +16,8 @@ import type {
   ListIncidentsQuery,
   UpdateIncidentStatusBody,
 } from '../types/incident.types.js';
+import { request } from 'node:http';
+import { error } from 'node:console';
 
 //POST
 export const createIncidentHandler = async (
@@ -127,5 +129,46 @@ export const updateIncidentStatusHandler = async (
     return reply.code(500).send({
       message: 'Unable to update incident status',
     });
+  }
+};
+
+//POST: Cancle an incident
+export const cancelIncidentHandler = async(
+  request: FastifyRequest<{Params: {id: string}}>,
+  reply: FastifyReply,
+) => {
+  try{
+    const incident = await updateIncidentStatus(
+      request.params.id,
+      'CANCELLED',
+    );
+    return reply.code(200).send({
+      message: 'Incident cancelled successfully',
+      data: incident,
+    });
+  }catch(error){
+    if(error instanceof IncidentNotFoundError){
+      return reply.code(404).send({
+        message: 'Incident not found',
+      });
+    }
+    if(error instanceof InvalidStatusTransitionError){
+      return reply.code(422).send({
+        message: error.message,
+        currentStatus: error.currentStatus,
+        requestedStatus: error.requestedStatus,
+      });
+    }
+    if(error instanceof IncidentStatusConflictError){
+      return reply.code(409).send({
+        message: error.message,
+      });
+    }
+    request.log.error(error, 'Failed to cancel incidnt please check & try again!!');
+
+    return reply.code(500).send({
+      message: 'Unable to proceed with your cancelation request!!'
+    });
+
   }
 };

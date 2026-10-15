@@ -12,6 +12,7 @@ import {
   listIncidentsHandler,
   getIncidentByIdHandler,
   updateIncidentStatusHandler,
+  cancelIncidentHandler,
 } from '../controllers/incident.controller.js';
 
 import {
@@ -24,6 +25,7 @@ import {
 export const incidentRoutes = async (
   app: FastifyInstance,
 ): Promise<void> => {
+  //Status Update
   app.patch(
     '/:id/status',
     {
@@ -34,6 +36,16 @@ export const incidentRoutes = async (
     },
     updateIncidentStatusHandler,
   );
+ //Cancel 
+ app.post(
+  '/:id/cancel',
+  {
+    schema:{
+      params: incidentIdValidationParamsSchema,
+    },
+  },
+  cancelIncidentHandler,
+ );
     // app.get(
     // '/:id',
     // {
