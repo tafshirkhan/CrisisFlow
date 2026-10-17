@@ -1,10 +1,18 @@
 
 import Fastify from 'fastify';
+import multipart from '@fastify/multipart';
 import { incidentRoutes } from './routes/incident.routes.js';
 
 export const buildApp = () => {
   const app = Fastify({
     logger: false,
+  });
+  // Enable multipart file uploads.
+  app.register(multipart, {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50 MB per file
+      files: 1, // One file per request
+    },
   });
 
   app.get('/health', async () => {

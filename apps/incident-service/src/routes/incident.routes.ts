@@ -14,6 +14,9 @@ import {
   updateIncidentStatusHandler,
   cancelIncidentHandler,
 } from '../controllers/incident.controller.js';
+import {
+  uploadIncidentAttachmentHandler,
+} from '../controllers/incident-attachment.controller.js';
 
 import {
   incidentIdValidationParamsSchema,
@@ -25,6 +28,17 @@ import {
 export const incidentRoutes = async (
   app: FastifyInstance,
 ): Promise<void> => {
+
+  // Upload an attachment to an incident
+  app.post(
+    '/:id/attachments',
+    {
+      schema: {
+        params: incidentIdValidationParamsSchema,
+      },
+    },
+    uploadIncidentAttachmentHandler,
+  );
   //Status Update
   app.patch(
     '/:id/status',
