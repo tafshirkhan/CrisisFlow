@@ -16,8 +16,6 @@ import type {
   ListIncidentsQuery,
   UpdateIncidentStatusBody,
 } from '../types/incident.types.js';
-import { request } from 'node:http';
-import { error } from 'node:console';
 
 //POST
 export const createIncidentHandler = async (
