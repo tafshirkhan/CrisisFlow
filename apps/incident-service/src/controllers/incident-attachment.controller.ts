@@ -1,4 +1,3 @@
-
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import {
@@ -6,6 +5,7 @@ import {
   UnsupportedAttachmentTypeError,
   uploadIncidentAttachment,
 } from '../services/incident-attachment.service.js';
+import { InvalidFileSignatureError } from '../storage/local-file-storage.js';
 
 type IncidentAttachmentParams = {
   id: string;
@@ -26,6 +26,7 @@ export const uploadIncidentAttachmentHandler = async (
       return reply.code(400).send({
         message: 'No file was provided. Upload a file using the "file" field.',
       });
+      
     }
 
     const attachment = await uploadIncidentAttachment({
@@ -75,7 +76,23 @@ export const uploadIncidentAttachmentHandler = async (
       });
     }
 
+    if (error instanceof InvalidFileSignatureError) {
+      return reply.code(415).send({
+        message: error.message,
+      });
+    }
+
     request.log.error({ err: error }, 'Incident attachment upload failed');
+
+    // Handle requests without valid multipart file content.
+    // if (
+    //   error instanceof Error &&
+    //   error.message.toLowerCase().includes('multipart')
+    // ) {
+    //   return reply.code(400).send({
+    //     message: 'No file was provided. Upload a file using the "file" field.',
+    //   });
+    // }
 
     return reply.code(500).send({
       message: 'Unable to upload incident attachment',

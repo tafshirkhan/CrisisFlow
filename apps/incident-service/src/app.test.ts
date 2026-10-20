@@ -4,13 +4,34 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 import { createIncident, updateIncidentStatus, findIncidentById,listIncidents } from './repositories/incident.repository.js';
 import { InvalidStatusTransitionError,} from './services/incident.service.js';
+import { createIncidentAttachment } from './repositories/incident-attachment.repository.js';
+import { storeIncidentFile, deleteStoredIncidentFile, InvalidFileSignatureError, } from './storage/local-file-storage.js';
 
+
+//MOCK FOR INCIDENT REPORT
 vi.mock('./repositories/incident.repository.js', () => ({
   createIncident: vi.fn(),
   listIncidents: vi.fn(),
   findIncidentById: vi.fn(),
   updateIncidentStatus: vi.fn(),
 }));
+
+
+//MOCK FOR INCIDENT ATTACHMENT
+vi.mock('./repositories/incident-attachment.repository.js', () => ({
+  createIncidentAttachment: vi.fn(),
+}));
+
+vi.mock('./storage/local-file-storage.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./storage/local-file-storage.js')>();
+
+  return {
+    ...actual,
+    storeIncidentFile: vi.fn(),
+    deleteStoredIncidentFile: vi.fn(),
+  };
+});
 
 describe('CrisisFlow API', () => {
   afterEach(() => {
@@ -321,7 +342,6 @@ it('updates an incident status through PATCH', async () => {
         status: 'RECEIVED',
       },
     });
-    console.log('PATCH response:', response.statusCode, response.body);
 
     expect(response.statusCode).toBe(200);
     expect(response.json().message).toBe(
@@ -334,10 +354,307 @@ it('updates an incident status through PATCH', async () => {
       'REPORTED',
       'RECEIVED',
     );
+  } 
+  finally {
+    await app.close();
+  }
+  });
+  
+  //INCIDENT ATTCHMENT
+  //A valid JPEG-signature multipart request returns 201 and doesn't expose storage_key
+  //A request without a file returns 400.
+  //An upload to a nonexistent incident returns 404 without storing a file.
+  it('uploads an attachment through POST /api/v1/incidents/:id/attachments', async () => {
+    vi.mocked(findIncidentById).mockResolvedValueOnce({
+      id: INCIDENT_ID,
+    } as never);
+
+    vi.mocked(storeIncidentFile).mockResolvedValueOnce({
+      storageKey: '84f10a71-9ccb-4da7-ba4a-4a41dcd6b1da.jpg',
+      fileSizeBytes: 22592,
+    });
+
+    vi.mocked(createIncidentAttachment).mockResolvedValueOnce({
+      id: 'f1cb68b2-38ec-4354-821f-43ccc8957234',
+      incident_id: INCIDENT_ID,
+      file_name: 'images.jpg',
+      mime_type: 'image/jpeg',
+      file_size_bytes: '22592',
+      storage_key: '84f10a71-9ccb-4da7-ba4a-4a41dcd6b1da.jpg',
+      uploaded_by: null,
+      uploaded_at: new Date(),
+    } as never);
+
+    const app = buildApp();
+
+    try {
+      const boundary = 'test-boundary';
+      const body = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="images.jpg"',
+        'Content-Type: image/jpeg',
+        '',
+        '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01',
+        `--${boundary}--`,
+        '',
+      ].join('\r\n');
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+        headers: {
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+        },
+        payload: Buffer.from(body, 'binary'),
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().message).toBe(
+        'Incident attachment uploaded successfully',
+      );
+      expect(response.json().attachment.incident_id).toBe(INCIDENT_ID);
+      expect(response.json().attachment.storage_key).toBeUndefined();
+      expect(storeIncidentFile).toHaveBeenCalledOnce();
+      expect(createIncidentAttachment).toHaveBeenCalledOnce();
+    } finally {
+      await app.close();
+    }
+  });
+
+  
+  it('returns 415 when uploading an unsupported file type', async () => {
+    vi.mocked(findIncidentById).mockResolvedValueOnce({
+      id: INCIDENT_ID,
+    } as never);
+
+    const app = buildApp();
+
+    try {
+      const boundary = 'unsupported-file-boundary';
+      const body = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="document.pdf"',
+        'Content-Type: application/pdf',
+        '',
+        'Test PDF content',
+        `--${boundary}--`,
+        '',
+      ].join('\r\n');
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+        headers: {
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+        },
+        payload: body,
+      });
+
+      expect(response.statusCode).toBe(415);
+      expect(response.json().message).toBeDefined();
+      expect(storeIncidentFile).not.toHaveBeenCalled();
+      expect(createIncidentAttachment).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  
+// it('returns 413 when an uploaded file exceeds 50 MiB', async () => {
+//   vi.mocked(findIncidentById).mockResolvedValueOnce({
+//     id: INCIDENT_ID,
+//   } as never);
+
+//   const app = buildApp();
+//     const sizeLimitError = Object.assign(
+//     new Error('The uploaded file exceeds the 50 MB limit'),
+//     { code: 'FST_REQ_FILE_TOO_LARGE' },
+//   );
+
+// vi.mocked(storeIncidentFile).mockRejectedValueOnce(sizeLimitError);
+
+//   try {
+//     const boundary = 'oversized-file-boundary';
+
+//     const body = [
+//       `--${boundary}`,
+//       'Content-Disposition: form-data; name="file"; filename="large.jpg"',
+//       'Content-Type: image/jpeg',
+//       '',
+//       '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01',
+//       `--${boundary}--`,
+//       '',
+//     ].join('\r\n');
+
+//     const response = await app.inject({
+//       method: 'POST',
+//       url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+//       headers: {
+//         'content-type': `multipart/form-data; boundary=${boundary}`,
+//       },
+//       payload: Buffer.from(body, 'binary'),
+//     });
+
+//     expect(response.statusCode).toBe(413);
+//     expect(storeIncidentFile).toHaveBeenCalled();
+//     expect(createIncidentAttachment).not.toHaveBeenCalled();
+//   } finally {
+//     await app.close();
+//   }
+// });
+
+
+it('returns 413 when an uploaded file exceeds 50 MiB', async () => {
+  vi.mocked(findIncidentById).mockResolvedValueOnce({
+    id: INCIDENT_ID,
+  } as never);
+
+  // Use the real storage implementation for this test.
+  vi.mocked(storeIncidentFile).mockImplementationOnce(
+    async (fileStream, mimeType) => {
+      const { storeIncidentFile: realStoreIncidentFile } =
+        await vi.importActual<
+          typeof import('./storage/local-file-storage.js')
+        >('./storage/local-file-storage.js');
+
+      return realStoreIncidentFile(fileStream, mimeType);
+    },
+  );
+
+  const app = buildApp();
+
+  try {
+    const boundary = 'real-oversized-file-boundary';
+    const fileSize = 50 * 1024 * 1024 + 1;
+
+    const header = Buffer.from(
+      `--${boundary}\r\n` +
+        'Content-Disposition: form-data; name="file"; filename="large.jpg"\r\n' +
+        'Content-Type: image/jpeg\r\n\r\n',
+      'utf8',
+    );
+
+    // Begin with a valid JPEG signature, followed by enough data to exceed
+    // Fastify's configured 50 MiB limit.
+    const fileContent = Buffer.alloc(fileSize, 0x41);
+    fileContent.set([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+
+    const footer = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
+    const payload = Buffer.concat([header, fileContent, footer]);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+      headers: {
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(413);
+    expect(createIncidentAttachment).not.toHaveBeenCalled();
   } finally {
     await app.close();
   }
 });
 
 
+  it('rejects a file with invalid content declared as JPEG', async () => {
+  vi.mocked(findIncidentById).mockResolvedValueOnce({
+    id: INCIDENT_ID,
+  } as never);
+
+  vi.mocked(storeIncidentFile).mockRejectedValueOnce(
+    new InvalidFileSignatureError(),
+  );
+
+  const app = buildApp();
+
+  try {
+    const boundary = 'invalid-content-boundary';
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="fake.jpg"',
+      'Content-Type: image/jpeg',
+      '',
+      'This is plain text, not a JPEG image.',
+      `--${boundary}--`,
+      '',
+    ].join('\r\n');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+      headers: {
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    });
+
+    expect(response.statusCode).toBe(415);
+    expect(storeIncidentFile).toHaveBeenCalledOnce();
+    expect(createIncidentAttachment).not.toHaveBeenCalled();
+  } finally {
+    await app.close();
+  }
+});
+
+
+  it('returns 400 when no file is provided', async () => {
+    const app = buildApp();
+
+    try {
+        const boundary = 'test-boundary';
+
+        const response = await app.inject({
+          method: 'POST',
+          url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+          headers: {
+            'content-type': `multipart/form-data; boundary=${boundary}`,
+          },
+          payload:
+            `--${boundary}\r\n` +
+            'Content-Disposition: form-data; name="description"\r\n\r\n' +
+            'No attachment included\r\n' +
+            `--${boundary}--\r\n`,
+        });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain('No file was provided');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns 404 when uploading to a nonexistent incident', async () => {
+    vi.mocked(findIncidentById).mockResolvedValueOnce(null as never);
+
+    const app = buildApp();
+
+    try {
+      const boundary = 'missing-incident-boundary';
+      const body = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="images.jpg"',
+        'Content-Type: image/jpeg',
+        '',
+        '\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01',
+        `--${boundary}--`,
+        '',
+      ].join('\r\n');
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+        headers: {
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+        },
+        payload: Buffer.from(body, 'binary'),
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(storeIncidentFile).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
 });
