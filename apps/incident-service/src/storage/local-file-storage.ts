@@ -211,3 +211,27 @@ export const deleteStoredIncidentFile = async (
 
   await rm(filePath, { force: true });
 };
+
+//Validates that the storage key follows the expected UUID filename format.
+//Allows only .jpg, .png, .webp, and .mp4 extensions.
+//Resolves the file path inside the configured upload directory.
+export const getStoredIncidentFilePath = (
+  storageKey: string,
+): string => {
+  // Accept only generated UUID filenames with supported extensions.
+  const validStorageKey =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|mp4)$/i;
+
+  if (!validStorageKey.test(storageKey)) {
+    throw new Error('Invalid storage key');
+  }
+
+  const filePath = resolve(UPLOAD_DIRECTORY, storageKey);
+
+  // Prevent directory traversal outside the upload directory.
+  if (!filePath.startsWith(`${UPLOAD_DIRECTORY}${sep}`)) {
+    throw new Error('Invalid storage path');
+  }
+
+  return filePath;
+};

@@ -1,12 +1,16 @@
 
 import type { Readable } from 'node:stream';
+import { stat } from 'node:fs/promises';
 
 import { findIncidentById } from '../repositories/incident.repository.js';
 import {
   createIncidentAttachment,
+  findIncidentAttachmentById,
+  listIncidentAttachmentsByIncidentId,
 } from '../repositories/incident-attachment.repository.js';
 import {
   deleteStoredIncidentFile,
+  getStoredIncidentFilePath,
   storeIncidentFile,
 } from '../storage/local-file-storage.js';
 
@@ -90,4 +94,98 @@ export const uploadIncidentAttachment = async (
 
     throw error;
   }
+};
+
+
+//This function retrieves the metadata and resolves the storage path. 
+//The controller will later stream the file without exposing the physical path or storage_key in the response
+export class IncidentAttachmentNotFoundError extends Error {
+  constructor() {
+    super('Incident attachment not found');
+    this.name = 'IncidentAttachmentNotFoundError';
+  }
+}
+
+export class IncidentAttachmentFileMissingError extends Error {
+  constructor() {
+    super('The stored attachment file is missing');
+    this.name = 'IncidentAttachmentFileMissingError';
+  }
+}
+
+// export const getIncidentAttachment = async (
+//   attachmentId: string,
+// ) => {
+//   const attachment = await findIncidentAttachmentById(attachmentId);
+
+//   if (!attachment) {
+//     throw new IncidentAttachmentNotFoundError();
+//   }
+
+//   const filePath = getStoredIncidentFilePath(attachment.storage_key);
+
+//   return {
+//     attachment,
+//     filePath,
+//   };
+// };
+
+export const getIncidentAttachment = async (
+  incidentId: string,
+  attachmentId: string,
+) => {
+  const attachment =
+    await findIncidentAttachmentById(attachmentId);
+
+  // Return not found if the attachment doesn't exist
+  // or belongs to another incident.
+  if (
+    !attachment ||
+    attachment.incident_id !== incidentId
+  ) {
+    throw new IncidentAttachmentNotFoundError();
+  }
+
+  const filePath = getStoredIncidentFilePath(
+    attachment.storage_key,
+  );
+
+  try {
+    const fileInfo = await stat(filePath);
+
+    if (!fileInfo.isFile()) {
+      throw new IncidentAttachmentFileMissingError();
+    }
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      throw new IncidentAttachmentFileMissingError();
+    }
+
+    throw error;
+  }
+
+  return {
+    attachment,
+    filePath,
+  };
+};
+
+//this check, a request for an invalid incident ID could return an empty array, making it appear that the incident exists but has no attachments
+export const listIncidentAttachments = async (
+  incidentId: string,
+) => {
+  const incident = await findIncidentById(incidentId);
+
+  if (!incident) {
+    throw new AttachmentIncidentNotFoundError();
+  }
+
+  const attachments =
+    await listIncidentAttachmentsByIncidentId(incidentId);
+
+  return attachments;
 };

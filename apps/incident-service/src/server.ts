@@ -5,12 +5,12 @@ const app = buildApp();
 
 const start = async (): Promise<void> => {
   try {
-    await app.listen({
+    const address = await app.listen({
       port: Number(process.env.PORT ?? 3001),
       host: '127.0.0.1',
     });
 
-    app.log.info('Incident Service is running');
+    app.log.info(`Incident Service is running at ${address}`);
   } catch (error) {
     app.log.error(error);
     await app.close();

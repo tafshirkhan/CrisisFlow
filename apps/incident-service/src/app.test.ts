@@ -1,11 +1,11 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
+import { resolve } from 'node:path';
 import { buildApp } from './app.js';
 import { createIncident, updateIncidentStatus, findIncidentById,listIncidents } from './repositories/incident.repository.js';
 import { InvalidStatusTransitionError,} from './services/incident.service.js';
-import { createIncidentAttachment } from './repositories/incident-attachment.repository.js';
-import { storeIncidentFile, deleteStoredIncidentFile, InvalidFileSignatureError, } from './storage/local-file-storage.js';
+import { createIncidentAttachment, findIncidentAttachmentById,listIncidentAttachmentsByIncidentId } from './repositories/incident-attachment.repository.js';
+import { storeIncidentFile, deleteStoredIncidentFile, InvalidFileSignatureError, getStoredIncidentFilePath  } from './storage/local-file-storage.js';
 
 
 //MOCK FOR INCIDENT REPORT
@@ -20,6 +20,8 @@ vi.mock('./repositories/incident.repository.js', () => ({
 //MOCK FOR INCIDENT ATTACHMENT
 vi.mock('./repositories/incident-attachment.repository.js', () => ({
   createIncidentAttachment: vi.fn(),
+  findIncidentAttachmentById: vi.fn(),
+  listIncidentAttachmentsByIncidentId: vi.fn(),
 }));
 
 vi.mock('./storage/local-file-storage.js', async (importOriginal) => {
@@ -30,6 +32,7 @@ vi.mock('./storage/local-file-storage.js', async (importOriginal) => {
     ...actual,
     storeIncidentFile: vi.fn(),
     deleteStoredIncidentFile: vi.fn(),
+    getStoredIncidentFilePath: vi.fn(),
   };
 });
 
@@ -657,4 +660,214 @@ it('returns 413 when an uploaded file exceeds 50 MiB', async () => {
       await app.close();
     }
   });
+
+  //INCIDENT GET ATTACHMENT TEST
+  const ATTACHMENT_ID = '03b5c993-2bcb-42bd-9bb3-e418999dbabd';
+
+  const OTHER_INCIDENT_ID ='11111111-1111-4111-8111-111111111111';
+
+  const mockAttachment = {
+    id: ATTACHMENT_ID,
+    incident_id: INCIDENT_ID,
+    file_name: 'test-image.png',
+    mime_type: 'image/png',
+    file_size_bytes: '8641',
+    storage_key: 'c8366a4d-931c-4457-b7cb-24e7ce2ab6ae.png',
+    uploaded_by: null,
+    uploaded_at: new Date(),
+  };
+
+  it('retrieves an existing incident attachment', async () => {
+    vi.mocked(findIncidentAttachmentById).mockResolvedValueOnce(
+      mockAttachment as never,
+    );
+
+    // Use the package manifest as a real, readable test file.
+    vi.mocked(getStoredIncidentFilePath).mockReturnValueOnce(
+      resolve(process.cwd(), 'package.json'),
+    );
+
+    const app = buildApp();
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments/${ATTACHMENT_ID}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toContain('image/png');
+      expect(response.headers['content-disposition']).toContain('inline');
+      expect(response.body.length).toBeGreaterThan(0);
+
+      expect(findIncidentAttachmentById).toHaveBeenCalledWith(
+        ATTACHMENT_ID,
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns 404 when the attachment does not exist', async () => {
+    vi.mocked(findIncidentAttachmentById).mockResolvedValueOnce(
+      null as never,
+    );
+
+    const app = buildApp();
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments/${ATTACHMENT_ID}`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().message).toBe(
+        'Incident attachment not found',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns 404 when the attachment belongs to another incident', async () => {
+    vi.mocked(findIncidentAttachmentById).mockResolvedValueOnce(
+      mockAttachment as never,
+    );
+
+    const app = buildApp();
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/incidents/${OTHER_INCIDENT_ID}/attachments/${ATTACHMENT_ID}`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().message).toBe(
+        'Incident attachment not found',
+      );
+
+      // The service must reject the mismatch before resolving a file path.
+      expect(getStoredIncidentFilePath).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns 404 when the attachment file is missing from disk', async () => {
+    vi.mocked(findIncidentAttachmentById).mockResolvedValueOnce(
+      mockAttachment as never,
+    );
+
+    vi.mocked(getStoredIncidentFilePath).mockReturnValueOnce(
+      resolve(process.cwd(), 'missing-test-attachment.png'),
+    );
+
+    const app = buildApp();
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments/${ATTACHMENT_ID}`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().message).toBe(
+        'The stored attachment file is missing',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+ 
+
+  //INCIDENT GET ATTACHMENT LIST TEST
+  const attachment = {
+    id: '03b5c993-2bcb-42bd-9bb3-e418999dbabd',
+    incident_id: INCIDENT_ID,
+    file_name: 'test1.png',
+    mime_type: 'image/png',
+    file_size_bytes: '8641',
+    storage_key: 'c8366a4d-931c-4457-b7cb-24e7ce2ab6ae.png',
+    uploaded_by: null,
+    uploaded_at: new Date(),
+  };
+
+  it('lists attachments for an existing incident', async () => {
+    vi.mocked(findIncidentById).mockResolvedValueOnce({
+      id: INCIDENT_ID,
+    } as never);
+
+    vi.mocked(listIncidentAttachmentsByIncidentId)
+      .mockResolvedValueOnce([attachment] as never);
+
+    const app = buildApp();
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().count).toBe(1);
+      expect(response.json().attachments).toHaveLength(1);
+      expect(response.json().attachments[0].file_name).toBe(
+        'test1.png',
+      );
+      expect(response.json().attachments[0].storage_key).toBeUndefined();
+
+      expect(listIncidentAttachmentsByIncidentId)
+        .toHaveBeenCalledWith(INCIDENT_ID);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns 404 when the incident does not exist', async () => {
+    vi.mocked(findIncidentById).mockResolvedValueOnce(null as never);
+
+    const app = buildApp();
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().message).toBe('Incident not found');
+
+      expect(listIncidentAttachmentsByIncidentId)
+        .not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns an empty list when the incident has no attachments', async () => {
+    vi.mocked(findIncidentById).mockResolvedValueOnce({
+      id: INCIDENT_ID,
+    } as never);
+
+    vi.mocked(listIncidentAttachmentsByIncidentId)
+      .mockResolvedValueOnce([] as never);
+
+    const app = buildApp();
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/incidents/${INCIDENT_ID}/attachments`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().count).toBe(0);
+      expect(response.json().attachments).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
+  
 });

@@ -16,6 +16,8 @@ import {
 } from '../controllers/incident.controller.js';
 import {
   uploadIncidentAttachmentHandler,
+  getIncidentAttachmentHandler,
+  listIncidentAttachmentsHandler,
 } from '../controllers/incident-attachment.controller.js';
 
 import {
@@ -28,6 +30,42 @@ import {
 export const incidentRoutes = async (
   app: FastifyInstance,
 ): Promise<void> => {
+
+  // List all attachments belonging to an incident
+  app.get(
+    '/:id/attachments',
+    {
+      schema: {
+        params: incidentIdValidationParamsSchema,
+      },
+    },
+    listIncidentAttachmentsHandler,
+  );
+
+  // Retrieve an attachment belonging to an incident
+  app.get(
+    '/:id/attachments/:attachmentId',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id', 'attachmentId'],
+          additionalProperties: false,
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+            },
+            attachmentId: {
+              type: 'string',
+              format: 'uuid',
+            },
+          },
+        },
+      },
+    },
+    getIncidentAttachmentHandler,
+  );
 
   // Upload an attachment to an incident
   app.post(
