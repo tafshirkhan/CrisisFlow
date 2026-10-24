@@ -61,6 +61,15 @@ export const createIncidentValidationBodySchema = {
       type: 'string',
       maxLength: 100,
     },
+    peopleAffected: {
+      type: 'integer',
+      minimum: 1,
+      default: 1,
+    },
+    additionalInformation: {
+      type: 'string',
+      maxLength: 5000,
+    },
   },
 } as const;
 

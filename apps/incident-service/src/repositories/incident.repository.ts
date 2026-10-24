@@ -21,9 +21,11 @@ export const createIncident = async (
       latitude,
       longitude,
       address,
-      reported_by
+      reported_by,
+      people_affected,
+      additional_information
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING
       id,
       reference_number,
@@ -35,6 +37,8 @@ export const createIncident = async (
       longitude,
       address,
       reported_by,
+      people_affected,
+      additional_information,
       created_at,
       updated_at`,
     [
@@ -45,6 +49,8 @@ export const createIncident = async (
       incident.longitude ?? null,
       incident.address ?? null,
       incident.reportedBy ?? null,
+      incident.peopleAffected ?? 1,
+      incident.additionalInformation?.trim() || null,
     ],
   );
 
@@ -97,6 +103,8 @@ export const listIncidents = async (
        longitude,
        address,
        reported_by,
+       people_affected,
+       additional_information,
        created_at,
        updated_at
      FROM incidents
@@ -133,6 +141,8 @@ export const findIncidentById = async (id: string) => {
        longitude,
        address,
        reported_by,
+       people_affected,
+       additional_information,
        created_at,
        updated_at
      FROM incidents
@@ -170,6 +180,8 @@ export const updateIncidentStatus = async (
        longitude,
        address,
        reported_by,
+       people_affected,
+       additional_information,
        created_at,
        updated_at`,
     [id, expectedStatus, newStatus],

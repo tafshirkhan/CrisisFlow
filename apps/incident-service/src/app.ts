@@ -1,5 +1,6 @@
 
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { incidentRoutes } from './routes/incident.routes.js';
 
@@ -7,6 +8,15 @@ export const buildApp = () => {
   const app = Fastify({
     logger: false,
   });
+
+  //CORS
+  app.register(cors, {
+    origin: [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+    ],
+  });
+
   // Enable multipart file uploads.
   app.register(multipart, {
     limits: {

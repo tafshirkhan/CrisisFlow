@@ -17,6 +17,8 @@ export interface CreateIncidentBody {
   longitude?: number;
   address?: string;
   reportedBy?: string;
+  peopleAffected?: number;
+  additionalInformation?: string;
 }
 
 export interface ListIncidentsQuery {
