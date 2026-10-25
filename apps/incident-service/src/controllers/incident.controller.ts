@@ -5,10 +5,12 @@ import {
   createIncident,
   listIncidents,
   getIncidentById,
+  getIncidentByReferenceNumber,
   updateIncidentStatus,
   IncidentNotFoundError,
   InvalidStatusTransitionError,
   IncidentStatusConflictError,
+  getIncidentStatusHistory,
 } from '../services/incident.service.js';
 
 import type {
@@ -79,6 +81,37 @@ export const getIncidentByIdHandler = async (
 
     return reply.code(500).send({
       message: 'Sorry, unable to retrieve incident try again in few mintues!!!',
+    });
+  }
+};
+
+//Inicdent by reference number
+export const getIncidentByReferenceNumberHandler = async (
+  request: FastifyRequest<{
+    Params: { referenceNumber: string };
+  }>,
+  reply: FastifyReply,
+) => {
+  try {
+    const incident = await getIncidentByReferenceNumber(
+      request.params.referenceNumber,
+    );
+
+    if (!incident) {
+      return reply.code(404).send({
+        message: 'Incident not found for this reference number',
+      });
+    }
+
+    return reply.code(200).send({ data: incident });
+  } catch (error) {
+    request.log.error(
+      error,
+      'Failed to retrieve incident by reference number',
+    );
+
+    return reply.code(500).send({
+      message: 'Unable to retrieve incident',
     });
   }
 };
@@ -168,5 +201,36 @@ export const cancelIncidentHandler = async(
       message: 'Unable to proceed with your cancelation request!!'
     });
 
+  }
+};
+
+
+export const getIncidentStatusHistoryHandler = async (
+  request: FastifyRequest<{
+    Params: { id: string };
+  }>,
+  reply: FastifyReply,
+) => {
+  try {
+    const incident = await getIncidentById(request.params.id);
+
+    if (!incident) {
+      return reply.code(404).send({
+        message: 'Incident not found',
+      });
+    }
+
+    const history = await getIncidentStatusHistory(request.params.id);
+
+    return reply.code(200).send({
+      count: history.length,
+      history,
+    });
+  } catch (error) {
+    request.log.error(error, 'Failed to retrieve incident status history');
+
+    return reply.code(500).send({
+      message: 'Unable to retrieve incident status history',
+    });
   }
 };

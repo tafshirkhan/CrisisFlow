@@ -89,6 +89,11 @@ export const uploadIncidentAttachmentHandler = async (
     }
 
     request.log.error({ err: error }, 'Incident attachment upload failed');
+    // console.error('[ATTACHMENT UPLOAD ERROR]', error);
+    // console.error(
+    //   '[ATTACHMENT UPLOAD STACK]',
+    //   error instanceof Error ? error.stack : String(error),
+    // );
 
     // Handle requests without valid multipart file content.
     // if (

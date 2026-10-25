@@ -13,6 +13,8 @@ import {
   getIncidentByIdHandler,
   updateIncidentStatusHandler,
   cancelIncidentHandler,
+  getIncidentByReferenceNumberHandler,
+  getIncidentStatusHistoryHandler,
 } from '../controllers/incident.controller.js';
 import {
   uploadIncidentAttachmentHandler,
@@ -25,6 +27,7 @@ import {
   updateIncidentValidationStatusBodySchema,
   createIncidentValidationBodySchema,
   listIncidentsValidationQuerySchema,
+  incidentReferenceValidationParamsSchema,
 } from '../validation-schemas/incident-validation.schema.js';
 
 export const incidentRoutes = async (
@@ -98,68 +101,40 @@ export const incidentRoutes = async (
   },
   cancelIncidentHandler,
  );
-    // app.get(
-    // '/:id',
-    // {
-    // schema: {
-    //     params: {
-    //     type: 'object',
-    //     required: ['id'],
-    //     additionalProperties: false,
-    //     properties: {
-    //         id: {
-    //         type: 'string',
-    //         format: 'uuid',
-    //         },
-    //     },
-    //     },
-    // },
-    // },
-    // getIncidentByIdHandler,
-    // );
 
-    app.get(
-    '/:id',
-    {
+ 
+app.get(
+  '/:id/status-history',
+  {
     schema: {
-        params: incidentIdValidationParamsSchema,
+      params: incidentIdValidationParamsSchema,
     },
+  },
+  getIncidentStatusHistoryHandler,
+);
+
+
+  app.get(
+  '/:id',
+  {
+  schema: {
+      params: incidentIdValidationParamsSchema,
+  },
+  },
+  getIncidentByIdHandler,
+  );
+
+  //Get by reference number
+  app.get(
+    '/reference/:referenceNumber',
+    {
+      schema: {
+        params: incidentReferenceValidationParamsSchema,
+      },
     },
-    getIncidentByIdHandler,
-    );
-  // app.get(
-  //   '/',
-  //   {
-  //     schema: {
-  //       querystring: {
-  //         type: 'object',
-  //         additionalProperties: false,
-  //         properties: {
-  //           status: {
-  //             type: 'string',
-  //             enum: [...INCIDENT_STATUSES],
-  //           },
-  //           priority: {
-  //             type: 'string',
-  //             enum: [...INCIDENT_PRIORITIES],
-  //           },
-  //           limit: {
-  //             type: 'integer',
-  //             minimum: 1,
-  //             maximum: 100,
-  //             default: 20,
-  //           },
-  //           offset: {
-  //             type: 'integer',
-  //             minimum: 0,
-  //             default: 0,
-  //           },
-  //         },
-  //       },
-  //     },
-  //   },
-  //   listIncidentsHandler,
-  // );
+    getIncidentByReferenceNumberHandler,
+  );
+ 
   app.get(
     '/',
     {
@@ -169,48 +144,7 @@ export const incidentRoutes = async (
     },
     listIncidentsHandler,
   );
-  // app.post(
-  //   '/',
-  //   {
-  //     schema: {
-  //       body: {
-  //         type: 'object',
-  //         additionalProperties: false,
-  //         required: ['type', 'description'],
-  //         properties: {
-  //           type: {
-  //             type: 'string',
-  //             enum: [...INCIDENT_TYPES],
-  //           },
-  //           description: {
-  //             type: 'string',
-  //             minLength: 10,
-  //             maxLength: 5000,
-  //           },
-  //           latitude: {
-  //             type: 'number',
-  //             minimum: -90,
-  //             maximum: 90,
-  //           },
-  //           longitude: {
-  //             type: 'number',
-  //             minimum: -180,
-  //             maximum: 180,
-  //           },
-  //           address: {
-  //             type: 'string',
-  //             maxLength: 1000,
-  //           },
-  //           reportedBy: {
-  //             type: 'string',
-  //             maxLength: 100,
-  //           },
-  //         },
-  //       },
-  //     },
-  //   },
-  //   createIncidentHandler,
-  // );
+  
   app.post(
     '/',
     {

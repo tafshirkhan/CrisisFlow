@@ -1,0 +1,96 @@
+//Axios is a JavaScript library used to send HTTP requests to a backend API.
+import axios from 'axios';
+import type {
+  CreateIncidentRequest,
+  CreateIncidentResponse,
+  CreatedIncident,
+  IncidentAttachment,
+  ListIncidentAttachmentsResponse,
+  GetIncidentByReferenceResponse,
+  IncidentStatusHistoryResponse,
+} from '../types/incidentApi.types';
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ??
+  'http://127.0.0.1:3001/api/v1';
+
+// const api = axios.create({
+//   baseURL: API_BASE_URL,
+//   headers: {
+//     'Content-Type': 'application/json',
+//   },
+// });
+const api = axios.create({
+  baseURL: API_BASE_URL,
+});
+
+export async function createIncident(
+  incident: CreateIncidentRequest,
+): Promise<CreatedIncident> {
+  const response = await api.post<CreateIncidentResponse>(
+    '/incidents',
+    incident,
+  );
+
+  return response.data.incident;
+}
+
+export async function uploadIncidentAttachment(
+  incidentId: string,
+  file: File,
+): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  await api.post(
+    `/incidents/${incidentId}/attachments`,
+    formData,
+  );
+}
+
+export function getIncidentAttachmentUrl(
+  incidentId: string,
+  attachmentId: string,
+): string {
+  return `${API_BASE_URL}/incidents/${incidentId}/attachments/${attachmentId}`;
+}
+
+export async function listIncidentAttachments(
+  incidentId: string,
+): Promise<IncidentAttachment[]> {
+  const response = await api.get<ListIncidentAttachmentsResponse>(
+    `/incidents/${incidentId}/attachments`,
+  );
+
+  return response.data.attachments;
+}
+
+
+export async function getIncidentByReferenceNumber(
+  referenceNumber: string,
+): Promise<CreatedIncident> {
+  const response = await api.get<GetIncidentByReferenceResponse>(
+    `/incidents/reference/${encodeURIComponent(referenceNumber.trim())}`,
+  );
+
+  return response.data.data;
+}
+
+
+export async function cancelIncident(
+  incidentId: string,
+): Promise<void> {
+  await api.post(`/incidents/${encodeURIComponent(incidentId)}/cancel`);
+}
+
+
+export async function getIncidentStatusHistory(
+  incidentId: string,
+): Promise<IncidentStatusHistoryResponse> {
+  const response = await api.get<IncidentStatusHistoryResponse>(
+    `/incidents/${encodeURIComponent(incidentId)}/status-history`,
+  );
+
+  return response.data;
+}
+

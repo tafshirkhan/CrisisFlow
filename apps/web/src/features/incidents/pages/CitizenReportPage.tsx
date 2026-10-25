@@ -10,14 +10,77 @@ import IncidentLocationStep from '../components/IncidentLocation';
 import IncidentReview from '../components/IncidentReview';
 import ReportStepIndicator from '../components/IncidentReportStepIndicator';
 import ImportantInformation from '../components/ImportantInformation';
+import { useState } from 'react';
+import axios from 'axios';
+import {createIncident, uploadIncidentAttachment,listIncidentAttachments,getIncidentAttachmentUrl,} from '../api/incidentApi';
+import type { IncidentAttachment } from '../types/incidentApi.types';
+//useState is a React Hook that allows you to store and update data inside a functional component.
+//useState — Stores data and updates the UI when that data changes.
+//axios — Sends requests to a backend and receives responses.
 
 export default function CitizenReportPage() {
   const report = useIncidentReport();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
+  const [incidentReference, setIncidentReference] = useState('');
 
-  function handleSubmit() {
-    // Prototype only: no incident is saved to the backend yet.
+  const [submittedIncidentId, setSubmittedIncidentId] = useState('');
+  const [submittedAttachments, setSubmittedAttachments] = useState<IncidentAttachment[]>([]);
+
+async function handleSubmit() {
+  setIsSubmitting(true);
+  setSubmissionError('');
+
+  try {
+    const incident = await createIncident({
+      type:
+        report.form.type === 'MEDICAL_EMERGENCY'
+          ? 'MEDICAL'
+          : report.form.type,
+      description: report.form.description.trim(),
+      address: report.form.location.address.trim() || undefined,
+      latitude: report.form.location.latitude ?? undefined,
+      longitude: report.form.location.longitude ?? undefined,
+      peopleAffected: report.form.peopleAffected,
+      additionalInformation:
+        report.form.additionalInformation.trim() || undefined,
+    });
+
+    for (const evidence of report.evidence.files) {
+      await uploadIncidentAttachment(incident.id, evidence.file);
+    }
+
+    setIncidentReference(incident.reference_number);
+    setSubmittedIncidentId(incident.id);
+
+    const attachments = await listIncidentAttachments(incident.id);
+    setSubmittedAttachments(attachments);
     report.setSubmittedPreview(true);
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      setSubmissionError(
+        error.response?.data?.message ??
+          'Unable to submit your report. Please try again.',
+      );
+    } else {
+      setSubmissionError(
+        'An unexpected error occurred while submitting your report.',
+      );
+    }
+  } finally {
+    setIsSubmitting(false);
   }
+}
+
+const handleCreateAnotherReport = () => {
+  setIncidentReference('');
+  setSubmittedIncidentId('');
+  setSubmittedAttachments([]);
+  setSubmissionError('');
+  report.resetForm();
+};
+
+
 
   if (report.submittedPreview) {
     return (
@@ -31,27 +94,85 @@ export default function CitizenReportPage() {
           </div>
 
           <h1 className="mt-5 text-2xl font-bold text-slate-900">
-            Report preview complete
+            Incident report submitted
           </h1>
 
           <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-600">
-            Your incident report has passed the prototype review flow.
-            It has not been submitted to the CrisisFlow backend, and no
-            emergency services have been contacted.
+            Your incident report has been saved in CrisisFlow.
+            Reference number:
+          </p>
+          <p className='mt-3 text-xl fonr-bold text-blue-700'>
+            {incidentReference}
           </p>
 
+          {submittedAttachments.length > 0 && (
+            <section className="mt-6 text-left">
+              <h2 className="text-sm font-semibold text-slate-900">
+                Uploaded supporting evidence
+              </h2>
+
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {submittedAttachments.map((attachment) => {
+                  const attachmentUrl = getIncidentAttachmentUrl(
+                    submittedIncidentId,
+                    attachment.id,
+                  );
+
+                  return (
+                    <div
+                      key={attachment.id}
+                      className="overflow-hidden rounded-xl border border-slate-200 bg-white p-3"
+                    >
+                      {attachment.mime_type.startsWith('image/') ? (
+                        <a
+                          href={attachmentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Open ${attachment.file_name}`}
+                        >
+                          <img
+                            src={attachmentUrl}
+                            alt={attachment.file_name}
+                            className="h-40 w-full rounded-lg object-cover"
+                          />
+                        </a>
+                      ) : attachment.mime_type === 'video/mp4' ? (
+                        <video
+                          src={attachmentUrl}
+                          controls
+                          preload="metadata"
+                          className="w-full rounded-lg"
+                        >
+                          Your browser does not support video playback.
+                        </video>
+                      ) : null}
+
+                      <p className="mt-2 truncate text-sm font-medium text-slate-800">
+                        {attachment.file_name}
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        {(attachment.file_size_bytes / (1024 * 1024)).toFixed(2)} MB
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
+            {/* <button
               type="button"
               onClick={() => report.setSubmittedPreview(false)}
               className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Back to review
-            </button>
+            </button> */}
 
             <button
               type="button"
-              onClick={report.resetForm}
+              onClick={handleCreateAnotherReport}
               className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
             >
               Create another report
@@ -63,6 +184,7 @@ export default function CitizenReportPage() {
       </div>
     );
   }
+  
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -162,12 +284,19 @@ export default function CitizenReportPage() {
               <button
                 type="button"
                 onClick={handleSubmit}
+                disabled={isSubmitting}
                 className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
               >
-                Complete report preview
+                {isSubmitting ? 'Submitting Report.....' : 'Submit Incident Report'}
               </button>
             )}
           </div>
+
+          {submissionError && (
+              <p role="alert" className="mt-4 text-sm text-red-600">
+                {submissionError}
+              </p>
+            )}
         </section>
 
         <div className="space-y-5">

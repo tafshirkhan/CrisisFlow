@@ -98,3 +98,17 @@ export const listIncidentsValidationQuerySchema = {
     },
   },
 } as const;
+
+export const incidentReferenceValidationParamsSchema = {
+  type: 'object',
+  required: ['referenceNumber'],
+  additionalProperties: false,
+  properties: {
+    referenceNumber: {
+      type: 'string',
+      minLength: 11,
+      maxLength: 30,
+      pattern: '^CF-[A-Za-z0-9-]+$',
+    },
+  },
+} as const;
