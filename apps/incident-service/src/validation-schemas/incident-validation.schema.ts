@@ -43,6 +43,11 @@ export const createIncidentValidationBodySchema = {
       minLength: 10,
       maxLength: 5000,
     },
+    priority: {
+      type: 'string',
+      enum: [...INCIDENT_PRIORITIES],
+    }
+    ,
     latitude: {
       type: 'number',
       minimum: -90,

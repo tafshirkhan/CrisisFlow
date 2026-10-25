@@ -75,6 +75,7 @@ export const createIncident = async (
         reference_number,
         type,
         description,
+        priority,
         latitude,
         longitude,
         address,
@@ -82,7 +83,7 @@ export const createIncident = async (
         people_affected,
         additional_information
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING
         id,
         reference_number,
@@ -102,6 +103,7 @@ export const createIncident = async (
         referenceNumber,
         incident.type,
         incident.description.trim(),
+        incident.priority,
         incident.latitude ?? null,
         incident.longitude ?? null,
         incident.address ?? null,

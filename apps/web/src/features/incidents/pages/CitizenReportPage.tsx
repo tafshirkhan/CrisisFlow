@@ -13,6 +13,7 @@ import ImportantInformation from '../components/ImportantInformation';
 import { useState } from 'react';
 import axios from 'axios';
 import {createIncident, uploadIncidentAttachment,listIncidentAttachments,getIncidentAttachmentUrl,} from '../api/incidentApi';
+import SuccessToast from '../components/SuccessToast';
 import type { IncidentAttachment } from '../types/incidentApi.types';
 //useState is a React Hook that allows you to store and update data inside a functional component.
 //useState — Stores data and updates the UI when that data changes.
@@ -26,6 +27,7 @@ export default function CitizenReportPage() {
 
   const [submittedIncidentId, setSubmittedIncidentId] = useState('');
   const [submittedAttachments, setSubmittedAttachments] = useState<IncidentAttachment[]>([]);
+  const [successToast, setSuccessToast] = useState('');
 
 async function handleSubmit() {
   setIsSubmitting(true);
@@ -38,6 +40,7 @@ async function handleSubmit() {
           ? 'MEDICAL'
           : report.form.type,
       description: report.form.description.trim(),
+      priority: report.form.priority,
       address: report.form.location.address.trim() || undefined,
       latitude: report.form.location.latitude ?? undefined,
       longitude: report.form.location.longitude ?? undefined,
@@ -55,6 +58,8 @@ async function handleSubmit() {
 
     const attachments = await listIncidentAttachments(incident.id);
     setSubmittedAttachments(attachments);
+    setSuccessToast('Incident report submitted successfully!');
+
     report.setSubmittedPreview(true);
   } catch (error: unknown) {
     if (axios.isAxiosError(error)) {
@@ -85,6 +90,12 @@ const handleCreateAnotherReport = () => {
   if (report.submittedPreview) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
+            {successToast && (
+            <SuccessToast
+              message={successToast}
+              onClose={() => setSuccessToast('')}
+            />
+          )}
         <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
           <div
             className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-700"
@@ -188,6 +199,13 @@ const handleCreateAnotherReport = () => {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+          {successToast && (
+          <SuccessToast
+            message={successToast}
+            onClose={() => setSuccessToast('')}
+          />
+        )}
+
       <header>
         <p className="text-sm font-semibold text-blue-700">
           CITIZEN SERVICES

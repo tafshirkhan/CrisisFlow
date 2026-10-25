@@ -6,8 +6,8 @@ import {
   Search,
 } from 'lucide-react';
 
-import { getIncidentByReferenceNumber, cancelIncident, getIncidentStatusHistory, } from '../api/incidentApi';
-import type { CreatedIncident, IncidentStatusHistoryEntry,  } from '../types/incidentApi.types';
+import { getIncidentByReferenceNumber, cancelIncident, getIncidentStatusHistory, listIncidentAttachments, getIncidentAttachmentUrl, } from '../api/incidentApi';
+import type { CreatedIncident, IncidentStatusHistoryEntry, IncidentAttachment, } from '../types/incidentApi.types';
 import { toast } from 'sonner';
 
 export default function CitizenTrackingPage() {
@@ -33,6 +33,10 @@ export default function CitizenTrackingPage() {
   const [statusHistory, setStatusHistory] = useState<IncidentStatusHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+
+  const [attachments, setAttachments] = useState<IncidentAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [attachmentsError, setAttachmentsError] = useState('');
   
 
   async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -55,6 +59,22 @@ export default function CitizenTrackingPage() {
     const result = await getIncidentByReferenceNumber(reference);
     setIncident(result);
 
+    // Load uploaded photos and videos for this incident.
+    setAttachmentsLoading(true);
+    setAttachmentsError('');
+    setAttachments([]);
+
+    try {
+      const incidentAttachments = await listIncidentAttachments(result.id);
+      setAttachments(incidentAttachments);
+    } catch {
+      setAttachmentsError(
+        'Incident details were found, but uploaded evidence could not be loaded.',
+      );
+    } finally {
+      setAttachmentsLoading(false);
+    }
+
     // Load the real status history for this incident
     setHistoryLoading(true);
     setHistoryError('');
@@ -73,6 +93,11 @@ export default function CitizenTrackingPage() {
     } catch (err: unknown) {
     setIncident(null);
     setStatusHistory([]);
+
+    //This will prevents attachments from a previous search remaining visible when a new reference number is invalid.
+    setAttachments([]);
+    setAttachmentsError('');
+    setAttachmentsLoading(false);
 
     const statusCode =
         typeof err === 'object' && err !== null && 'response' in err
@@ -281,165 +306,174 @@ export default function CitizenTrackingPage() {
             )}
 
           </section>
+         
+         
+        {/* Incident Evidence: uploaded photos and videos */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-bold text-slate-900">
+            Incident Evidence
+          </h2>
 
-          {/* <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-bold text-slate-900">
-              Response progress
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Current progress based on the incident status.
+          <p className="mt-1 text-sm text-slate-500">
+            Photos and videos submitted with this incident report.
+          </p>
+
+          {attachmentsLoading ? (
+            <p className="mt-5 text-sm text-slate-500">
+              Loading photos and videos...
             </p>
+          ) : attachmentsError ? (
+            <p role="alert" className="mt-5 text-sm text-red-600">
+              {attachmentsError}
+            </p>
+          ) : attachments.length === 0 ? (
+            <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+              No photos or videos have been uploaded for this incident.
+            </p>
+          ) : (
+            <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {attachments.map((attachment) => {
+                const fileUrl = getIncidentAttachmentUrl(
+                  attachment.incident_id,
+                  attachment.id,
+                );
 
-            {incident.status === 'CANCELLED' ? (
-              <div className="mt-5 flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-amber-800">
-                <AlertCircle size={20} className="mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold">Report cancelled</p>
-                  <p className="mt-1 text-sm">
-                    This incident has been marked as cancelled.
-                  </p>
-                </div>
-              </div>
-            ) : currentStep >= 0 ? (
-              <ol className="mt-6 space-y-5">
-                {statusSteps.map((step, index) => {
-                  const completed = index <= currentStep;
-                  const current = index === currentStep;
+                const isImage = attachment.mime_type.startsWith('image/');
+                const isVideo = attachment.mime_type.startsWith('video/');
 
-                  return (
-                    <li key={step.value} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        {completed ? (
-                          <CheckCircle2
-                            size={22}
-                            className="shrink-0 text-emerald-600"
-                          />
-                        ) : (
-                          <Clock
-                            size={22}
-                            className="shrink-0 text-slate-300"
-                          />
-                        )}
-                        {index < statusSteps.length - 1 && (
-                          <div
-                            className={`mt-1 min-h-6 w-0.5 flex-1 ${
-                              index < currentStep
-                                ? 'bg-emerald-500'
-                                : 'bg-slate-200'
-                            }`}
-                          />
-                        )}
+                return (
+                  <article
+                    key={attachment.id}
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                  >
+                    {isImage ? (
+                      <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open ${attachment.file_name} in a new tab`}
+                      >
+                        <img
+                          src={fileUrl}
+                          alt={attachment.file_name}
+                          loading="lazy"
+                          className="h-56 w-full bg-slate-100 object-contain"
+                        />
+                      </a>
+                    ) : isVideo ? (
+                      <video
+                        src={fileUrl}
+                        controls
+                        preload="metadata"
+                        className="h-56 w-full bg-black object-contain"
+                        aria-label={attachment.file_name}
+                      >
+                        Your browser does not support video playback.
+                      </video>
+                    ) : (
+                      <div className="flex h-56 items-center justify-center bg-slate-50 p-4 text-sm text-slate-500">
+                        Preview is unavailable for this file type.
                       </div>
+                    )}
 
-                      <div className="pb-2">
-                        <p
-                          className={`text-sm font-semibold ${
-                            current ? 'text-blue-700' : completed ? 'text-slate-800' : 'text-slate-400'
-                          }`}
-                        >
-                          {step.label}
-                          {current && ' — Current status'}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : (
-              <div className="mt-5 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-slate-700">
-                <ShieldAlert size={20} className="mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold">
-                    {formatLabel(incident.status)}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    The incident has a status that is not included in the standard progress timeline.
-                  </p>
-                </div>
-              </div>
-            )}
+                    <div className="p-4">
+                      <p className="break-words text-sm font-semibold text-slate-800">
+                        {attachment.file_name}
+                      </p>
 
-            <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">
-              Last updated: {formatDate(incident.updated_at)}
+                      <p className="mt-1 text-xs text-slate-500">
+                        {isImage ? 'Photo' : isVideo ? 'Video' : 'Attachment'}
+                        {' · '}
+                        {(attachment.file_size_bytes / (1024 * 1024)).toFixed(2)} MB
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Uploaded {formatDate(attachment.uploaded_at)}
+                      </p>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Incident status update section  */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-bold text-slate-900">
+            Incident Status History
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            A timeline of recorded updates for your incident.
+          </p>
+
+          {historyLoading ? (
+            <p className="mt-5 text-sm text-slate-500">
+              Loading status history...
             </p>
-          </section> */}
-
-          
-<section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-  <h2 className="text-lg font-bold text-slate-900">
-    Incident Status History
-  </h2>
-  <p className="mt-1 text-sm text-slate-500">
-    A timeline of recorded updates for your incident.
-  </p>
-
-  {historyLoading ? (
-    <p className="mt-5 text-sm text-slate-500">
-      Loading status history...
-    </p>
-  ) : historyError ? (
-    <p className="mt-5 text-sm text-red-600" role="alert">
-      {historyError}
-    </p>
-  ) : statusHistory.length === 0 ? (
-    <p className="mt-5 text-sm text-slate-500">
-      No status history is available for this incident yet.
-    </p>
-  ) : (
-    <ol className="mt-6 space-y-5">
-      {statusHistory.map((entry, index) => (
-        <li key={entry.id} className="flex gap-3">
-          <div className="flex flex-col items-center">
-            {index === 0 ? (
-              <AlertCircle
-                size={22}
-                className="shrink-0 text-blue-600"
-              />
-            ) : (
-              <CheckCircle2
-                size={22}
-                className="shrink-0 text-emerald-600"
-              />
-            )}
-
-            {index < statusHistory.length - 1 && (
-              <div className="mt-1 min-h-6 w-0.5 flex-1 bg-slate-200" />
-            )}
-          </div>
-
-          <div className="pb-2">
-            <p className="text-sm font-semibold text-slate-800">
-              {formatLabel(entry.new_status)}
+          ) : historyError ? (
+            <p className="mt-5 text-sm text-red-600" role="alert">
+              {historyError}
             </p>
-
-            <p className="mt-1 text-sm text-slate-600">
-              {entry.previous_status
-                ? `${formatLabel(entry.previous_status)} → ${formatLabel(entry.new_status)}`
-                : 'Incident report submitted'}
+          ) : statusHistory.length === 0 ? (
+            <p className="mt-5 text-sm text-slate-500">
+              No status history is available for this incident yet.
             </p>
+          ) : (
+            <ol className="mt-6 space-y-5">
+              {statusHistory.map((entry, index) => (
+                <li key={entry.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    {index === 0 ? (
+                      <AlertCircle
+                        size={22}
+                        className="shrink-0 text-blue-600"
+                      />
+                    ) : (
+                      <CheckCircle2
+                        size={22}
+                        className="shrink-0 text-emerald-600"
+                      />
+                    )}
 
-            <p className="mt-2 text-xs text-slate-500">
-              {formatDate(entry.changed_at)}
-            </p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  )}
+                    {index < statusHistory.length - 1 && (
+                      <div className="mt-1 min-h-6 w-0.5 flex-1 bg-slate-200" />
+                    )}
+                  </div>
 
-  {incident.status === 'CANCELLED' && (
-    <div className="mt-5 rounded-xl bg-amber-50 p-4 text-amber-800">
-      <p className="font-semibold">Report cancelled</p>
-      <p className="mt-1 text-sm">
-        This incident has been marked as cancelled.
-      </p>
-    </div>
-  )}
+                  <div className="pb-2">
+                    <p className="text-sm font-semibold text-slate-800">
+                      {formatLabel(entry.new_status)}
+                    </p>
 
-  <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">
-    Last updated: {formatDate(incident.updated_at)}
-  </p>
-</section>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {entry.previous_status
+                        ? `${formatLabel(entry.previous_status)} → ${formatLabel(entry.new_status)}`
+                        : 'Incident report submitted'}
+                    </p>
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      {formatDate(entry.changed_at)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {incident.status === 'CANCELLED' && (
+            <div className="mt-5 rounded-xl bg-amber-50 p-4 text-amber-800">
+              <p className="font-semibold">Report cancelled</p>
+              <p className="mt-1 text-sm">
+                This incident has been marked as cancelled.
+              </p>
+            </div>
+          )}
+
+          <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">
+            Last updated: {formatDate(incident.updated_at)}
+          </p>
+        </section>
 
         </div>
       )}

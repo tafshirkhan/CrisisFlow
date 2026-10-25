@@ -13,6 +13,7 @@ export type IncidentPriority = (typeof INCIDENT_PRIORITIES)[number];
 export interface CreateIncidentBody {
   type: IncidentType;
   description: string;
+  priority: IncidentPriority;
   latitude?: number;
   longitude?: number;
   address?: string;

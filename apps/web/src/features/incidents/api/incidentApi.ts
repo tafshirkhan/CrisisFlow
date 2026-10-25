@@ -8,6 +8,7 @@ import type {
   ListIncidentAttachmentsResponse,
   GetIncidentByReferenceResponse,
   IncidentStatusHistoryResponse,
+  ListIncidentsResponse,
 } from '../types/incidentApi.types';
 
 const API_BASE_URL =
@@ -93,4 +94,31 @@ export async function getIncidentStatusHistory(
 
   return response.data;
 }
+
+
+export interface GetIncidentsParams {
+  limit?: number;
+  offset?: number;
+  priority?: string;
+}
+
+export async function getIncidents({
+  limit = 10,
+  offset = 0,
+  priority,
+}: GetIncidentsParams = {}): Promise<ListIncidentsResponse> {
+  const response = await api.get<ListIncidentsResponse>(
+    '/incidents',
+    {
+      params: {
+        limit,
+        offset,
+        ...(priority ? { priority: priority.toUpperCase() } : {}),
+      },
+    },
+  );
+
+  return response.data;
+}
+
 

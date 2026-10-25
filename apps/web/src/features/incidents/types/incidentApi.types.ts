@@ -2,6 +2,7 @@
 export interface CreateIncidentRequest {
   type: string;
   description: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   latitude?: number;
   longitude?: number;
   address?: string;
@@ -65,4 +66,15 @@ export interface IncidentStatusHistoryEntry {
 export interface IncidentStatusHistoryResponse {
   count: number;
   history: IncidentStatusHistoryEntry[];
+}
+
+
+export interface ListIncidentsResponse {
+  data: CreatedIncident[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
 }
