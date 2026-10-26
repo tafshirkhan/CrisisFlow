@@ -57,3 +57,29 @@ export async function registerCitizen(input: RegisterInput) {
     throw error;
   }
 }
+
+
+export async function loginCitizen(email: string, password: string) {
+  const user = await findUserByEmail(email);
+
+  if (!user || !user.is_active) {
+    throw new AuthError('Invalid email or password.', 401);
+  }
+
+  const passwordIsValid = await argon2.verify(
+    user.password_hash,
+    password,
+  );
+
+  if (!passwordIsValid) {
+    throw new AuthError('Invalid email or password.', 401);
+  }
+
+  return {
+    id: user.id,
+    fullName: user.full_name,
+    email: user.email,
+    role: user.role,
+  };
+}
+
