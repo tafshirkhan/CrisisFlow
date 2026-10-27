@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 
 import type { NavigationItem, Role } from '../types/app.types';
+import { useAuth } from '../features/auth/context/AuthContext';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import Footer from './Footer';
@@ -13,7 +14,6 @@ interface AppLayoutProps {
   activeMenu: string;
   pageTitle: string;
   mobileMenuOpen: boolean;
-  onRoleChange: (role: Role) => void;
   onMenuSelect: (menu: string) => void;
   onOpenMenu: () => void;
   onCloseMenu: () => void;
@@ -26,12 +26,13 @@ export default function AppLayout({
   activeMenu,
   pageTitle,
   mobileMenuOpen,
-  onRoleChange,
   onMenuSelect,
   onOpenMenu,
   onCloseMenu,
   children,
 }: AppLayoutProps) {
+  const { user, logout } = useAuth();
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <Toaster position="top-right" richColors />
@@ -43,28 +44,28 @@ export default function AppLayout({
           onClick={onCloseMenu}
         />
       )}
-      {/* //Side navigation */}
+
       <Sidebar
         role={role}
         navigation={navigation}
         activeMenu={activeMenu}
         mobileMenuOpen={mobileMenuOpen}
-        onRoleChange={onRoleChange}
         onMenuSelect={onMenuSelect}
         onClose={onCloseMenu}
       />
 
       <div className="min-h-screen lg:pl-64">
-        {/* //Header */}
         <Navbar
           role={role}
           pageTitle={pageTitle}
+          userName={user?.fullName ?? 'User'}
+          userEmail={user?.email ?? ''}
           onOpenMenu={onOpenMenu}
+          onLogout={logout}
         />
 
         <main className="mx-auto max-w-[1600px] space-y-7 p-4 sm:p-6 lg:p-8">
           {children}
-
           <Footer />
         </main>
       </div>
