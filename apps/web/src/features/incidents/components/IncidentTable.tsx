@@ -1,11 +1,11 @@
 
 import { useEffect, useState } from 'react';
 import { MapPin, Paperclip, ExternalLink } from 'lucide-react';
-
+import { toast } from 'sonner';
 import type { CreatedIncident, IncidentAttachment } from '../types/incidentApi.types';
 import {
   listIncidentAttachments,
-  getIncidentAttachmentUrl,
+  fetchIncidentAttachment,
 } from '../api/incidentApi';
 
 interface IncidentTableProps {
@@ -113,6 +113,43 @@ export default function IncidentTable({
     };
   }, [incidents]);
 
+  
+  async function handleOpenEvidence(attachment: IncidentAttachment) {
+    // Open a blank tab immediately to avoid popup blocking.
+    const newTab = window.open('about:blank', '_blank');
+
+    if (!newTab) {
+      toast.error('Allow pop-ups in your browser to open evidence.');
+      return;
+    }
+
+    newTab.opener = null;
+    newTab.document.title = 'Loading incident evidence...';
+    newTab.document.body.textContent = 'Loading evidence...';
+
+    try {
+      const blob = await fetchIncidentAttachment(
+        attachment.incident_id,
+        attachment.id,
+      );
+
+      const fileBlob = blob.type
+        ? blob
+        : new Blob([blob], { type: attachment.mime_type });
+
+      const objectUrl = URL.createObjectURL(fileBlob);
+
+      newTab.location.href = objectUrl;
+
+      // Keep the URL alive while the new tab displays or plays the file.
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 10 * 60 * 1000);
+    } catch (error) {
+      newTab.close();
+      console.error('Unable to open incident evidence:', error);
+      toast.error('Unable to open evidence. Please try again.');
+    }
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[690px] text-left">
@@ -198,26 +235,18 @@ export default function IncidentTable({
                         {attachments.length === 1 ? 'file' : 'files'}
                       </span>
 
-                      {attachments.map((attachment) => {
-                        const url = getIncidentAttachmentUrl(
-                          incident.id,
-                          attachment.id,
-                        );
-
+                      {attachments.map((attachment) => {                       
                         return (
-                          <a
+                          <button
                             key={attachment.id}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex max-w-[140px] items-center gap-1 truncate text-xs text-blue-700 hover:text-blue-900 hover:underline"
-                            title={attachment.file_name}
+                            type="button"
+                            onClick={() => void handleOpenEvidence(attachment)}
+                            className="inline-flex max-w-[180px] items-center gap-1 truncate text-left text-xs text-blue-700 hover:text-blue-900 hover:underline"
+                            title={`Open ${attachment.file_name}`}
                           >
-                            <ExternalLink size={12} />
-                            <span className="truncate">
-                              {attachment.file_name}
-                            </span>
-                          </a>
+                            <ExternalLink size={12} className="shrink-0" />
+                            <span className="truncate">{attachment.file_name}</span>
+                          </button>
                         );
                       })}
                     </div>

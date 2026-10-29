@@ -11,11 +11,29 @@ import {
   IncidentAttachmentFileMissingError,
 } from '../services/incident-attachment.service.js';
 import { InvalidFileSignatureError } from '../storage/local-file-storage.js';
-
+import { getIncidentById } from '../services/incident.service.js';
 
 type IncidentAttachmentParams = {
   id: string;
 };
+
+async function ensureIncidentAccess(
+  incidentId: string,
+  userId: string,
+  reply: FastifyReply,
+): Promise<boolean> {
+  const incident = await getIncidentById(incidentId, userId);
+
+  if (!incident) {
+    reply.code(404).send({
+      message: 'Incident not found',
+    });
+
+    return false;
+  }
+
+  return true;
+}
 
 export const uploadIncidentAttachmentHandler = async (
   request: FastifyRequest<{ Params: IncidentAttachmentParams }>,
@@ -26,6 +44,15 @@ export const uploadIncidentAttachmentHandler = async (
     | undefined;
 
   try {
+    if (request.user.role === 'CITIZEN') {
+      const hasAccess = await ensureIncidentAccess(
+        request.params.id,
+        request.user.sub,
+        reply,
+      );
+
+      if (!hasAccess) return;
+    }
     uploadedFile = await request.file();
 
     if (!uploadedFile) {
@@ -88,7 +115,8 @@ export const uploadIncidentAttachmentHandler = async (
       });
     }
 
-    request.log.error({ err: error }, 'Incident attachment upload failed');
+    //request.log.error({ err: error }, 'Incident attachment upload failed');
+    console.error('[ATTACHMENT UPLOAD ERROR]', error);
     // console.error('[ATTACHMENT UPLOAD ERROR]', error);
     // console.error(
     //   '[ATTACHMENT UPLOAD STACK]',
@@ -123,6 +151,15 @@ export const getIncidentAttachmentHandler = async (
   reply: FastifyReply,
 ) => {
   try {
+    if (request.user.role === 'CITIZEN') {
+      const hasAccess = await ensureIncidentAccess(
+        request.params.id,
+        request.user.sub,
+        reply,
+      );
+
+      if (!hasAccess) return;
+    }
     const { attachment, filePath } =
       await getIncidentAttachment(
         request.params.id,
@@ -178,6 +215,15 @@ export const listIncidentAttachmentsHandler = async (
   reply: FastifyReply,
 ) => {
   try {
+    if (request.user.role === 'CITIZEN') {
+      const hasAccess = await ensureIncidentAccess(
+        request.params.id,
+        request.user.sub,
+        reply,
+      );
+
+      if (!hasAccess) return;
+    }
     const attachments = await listIncidentAttachments(
       request.params.id,
     );

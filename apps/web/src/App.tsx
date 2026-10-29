@@ -4,12 +4,15 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
+  useNavigate,
 } from 'react-router-dom';
 
 import type { Role } from './types/app.types';
 import { roleMenus } from './constants/navigation';
 import { useAuth } from './features/auth/context/AuthContext';
 import ProtectedRoute from './features/auth/components/ProtectedRoute';
+import CitizenRoute from './features/auth/components/CitizenRoute';
 import { mapUserRoleToAppRole } from './features/auth/utils/roleMapper';
 import AppLayout from './layouts/AppLayout';
 import DashboardPage from './features/dashboard/pages/DashboardPage';
@@ -20,15 +23,26 @@ import RegisterPage from './features/auth/pages/RegisterPage';
 
 function Dashboard() {
   const { user } = useAuth();
+  const location = useLocation();
   const role: Role = mapUserRoleToAppRole(user!.role);
 
-  const [activeMenu, setActiveMenu] = useState(roleMenus[role][0].label);
+  const [activeMenu, setActiveMenu] = useState(
+    roleMenus[role][0].label,
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  
 
   useEffect(() => {
-    setActiveMenu(roleMenus[role][0].label);
+      if (location.pathname === '/citizen/report') {
+        setActiveMenu('Report Emergency');
+      } else if (location.pathname === '/citizen/reports') {
+        setActiveMenu('My Reports');
+      } else {
+        setActiveMenu(roleMenus[role][0].label);
+    }
     setMobileMenuOpen(false);
-  }, [role]);
+  }, [role, location.pathname]);
 
   const navigation = roleMenus[role];
 
@@ -48,12 +62,24 @@ function Dashboard() {
       onOpenMenu={() => setMobileMenuOpen(true)}
       onCloseMenu={() => setMobileMenuOpen(false)}
     >
-      {role === 'Citizen' && activeMenu === 'Report Emergency' ? (
+     {location.pathname === '/citizen/report' ? (
         <CitizenReportPage />
-      ) : role === 'Citizen' && activeMenu === 'My Reports' ? (
+      ) : location.pathname === '/citizen/reports' ? (
         <CitizenTrackingPage />
       ) : (
-        <DashboardPage role={role} onMenuSelect={setActiveMenu} />
+        <DashboardPage
+          role={role}
+          onMenuSelect={(menu) => {
+            setActiveMenu(menu);
+            if (menu === 'My Dashboard') {
+              navigate('/');
+            } else if (menu === 'Report Emergency') {
+              navigate('/citizen/report');
+            } else if (menu === 'My Reports') {
+              navigate('/citizen/reports');
+            }
+          }}
+        />
       )}
     </AppLayout>
   );
@@ -77,6 +103,7 @@ function RegisterRoute() {
   return <RegisterPage />;
 }
 
+
 export default function App() {
   return (
     <Routes>
@@ -85,9 +112,21 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Dashboard />} />
+
+        <Route element={<CitizenRoute />}>
+          <Route
+            path="/citizen/report"
+            element={<Dashboard />}
+          />
+          <Route
+            path="/citizen/reports"
+            element={<Dashboard />}
+          />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
+

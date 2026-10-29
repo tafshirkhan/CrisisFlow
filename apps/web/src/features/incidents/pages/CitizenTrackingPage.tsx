@@ -1,14 +1,114 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
   Search,
 } from 'lucide-react';
 
-import { getIncidentByReferenceNumber, cancelIncident, getIncidentStatusHistory, listIncidentAttachments, getIncidentAttachmentUrl, } from '../api/incidentApi';
+import { getIncidentByReferenceNumber, cancelIncident, getIncidentStatusHistory, listIncidentAttachments, fetchIncidentAttachment } from '../api/incidentApi';
 import type { CreatedIncident, IncidentStatusHistoryEntry, IncidentAttachment, } from '../types/incidentApi.types';
 import { toast } from 'sonner';
+
+
+function IncidentEvidencePreview({
+  attachment,
+}: {
+  attachment: IncidentAttachment;
+}) {
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+
+    async function loadEvidence() {
+      setLoading(true);
+      setError(false);
+
+      try {
+        const blob = await fetchIncidentAttachment(
+          attachment.incident_id,
+          attachment.id,
+        );
+
+        if (!active) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setFileUrl(objectUrl);
+      } catch (err) {
+        console.error('Failed to load incident evidence:', err);
+
+        if (active) setError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadEvidence();
+
+    return () => {
+      active = false;
+
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.id, attachment.incident_id]);
+
+  if (loading) {
+    return (
+      <div className="flex h-56 items-center justify-center bg-slate-100 text-sm text-slate-500">
+        Loading evidence...
+      </div>
+    );
+  }
+
+  if (error || !fileUrl) {
+    return (
+      <div className="flex h-56 items-center justify-center bg-red-50 text-sm text-red-600">
+        Unable to load evidence.
+      </div>
+    );
+  }
+
+  if (attachment.mime_type.startsWith('image/')) {
+    return (
+      <a
+        href={fileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open ${attachment.file_name}`}
+      >
+        <img
+          src={fileUrl}
+          alt={attachment.file_name}
+          className="h-56 w-full bg-slate-100 object-contain"
+        />
+      </a>
+    );
+  }
+
+  if (attachment.mime_type.startsWith('video/')) {
+    return (
+      <video
+        src={fileUrl}
+        controls
+        preload="metadata"
+        className="h-56 w-full bg-black object-contain"
+        aria-label={attachment.file_name}
+      >
+        Your browser does not support video playback.
+      </video>
+    );
+  }
+
+  return (
+    <div className="flex h-56 items-center justify-center bg-slate-50 text-sm text-slate-500">
+      Preview unavailable for this file type.
+    </div>
+  );
+}
 
 export default function CitizenTrackingPage() {
    
@@ -332,12 +432,8 @@ export default function CitizenTrackingPage() {
             </p>
           ) : (
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+              
               {attachments.map((attachment) => {
-                const fileUrl = getIncidentAttachmentUrl(
-                  attachment.incident_id,
-                  attachment.id,
-                );
-
                 const isImage = attachment.mime_type.startsWith('image/');
                 const isVideo = attachment.mime_type.startsWith('video/');
 
@@ -346,35 +442,7 @@ export default function CitizenTrackingPage() {
                     key={attachment.id}
                     className="overflow-hidden rounded-xl border border-slate-200 bg-white"
                   >
-                    {isImage ? (
-                      <a
-                        href={fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open ${attachment.file_name} in a new tab`}
-                      >
-                        <img
-                          src={fileUrl}
-                          alt={attachment.file_name}
-                          loading="lazy"
-                          className="h-56 w-full bg-slate-100 object-contain"
-                        />
-                      </a>
-                    ) : isVideo ? (
-                      <video
-                        src={fileUrl}
-                        controls
-                        preload="metadata"
-                        className="h-56 w-full bg-black object-contain"
-                        aria-label={attachment.file_name}
-                      >
-                        Your browser does not support video playback.
-                      </video>
-                    ) : (
-                      <div className="flex h-56 items-center justify-center bg-slate-50 p-4 text-sm text-slate-500">
-                        Preview is unavailable for this file type.
-                      </div>
-                    )}
+                    <IncidentEvidencePreview attachment={attachment} />
 
                     <div className="p-4">
                       <p className="break-words text-sm font-semibold text-slate-800">
@@ -394,6 +462,7 @@ export default function CitizenTrackingPage() {
                   </article>
                 );
               })}
+
             </div>
           )}
         </section>

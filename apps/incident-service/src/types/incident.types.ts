@@ -18,6 +18,7 @@ export interface CreateIncidentBody {
   longitude?: number;
   address?: string;
   reportedBy?: string;
+  reporterId?: string;
   peopleAffected?: number;
   additionalInformation?: string;
 }
@@ -27,6 +28,7 @@ export interface ListIncidentsQuery {
   priority?: IncidentPriority;
   limit?: number;
   offset?: number;
+  reporterId?: string;
 }
 
 

@@ -80,10 +80,11 @@ export const createIncident = async (
         longitude,
         address,
         reported_by,
+        reporter_id,
         people_affected,
         additional_information
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING
         id,
         reference_number,
@@ -95,6 +96,7 @@ export const createIncident = async (
         longitude,
         address,
         reported_by,
+        reporter_id,
         people_affected,
         additional_information,
         created_at,
@@ -108,6 +110,7 @@ export const createIncident = async (
         incident.longitude ?? null,
         incident.address ?? null,
         incident.reportedBy ?? null,
+        incident.reporterId ?? null,
         incident.peopleAffected ?? 1,
         incident.additionalInformation?.trim() || null,
       ],
@@ -144,8 +147,10 @@ export const createIncident = async (
 
 
 //Get all the incidents
+
 export const listIncidents = async (
   query: ListIncidentsQuery,
+  reporterId?: string,
 ) => {
   const { status, priority } = query;
   const limit = query.limit ?? 20;
@@ -153,6 +158,11 @@ export const listIncidents = async (
 
   const conditions: string[] = [];
   const values: (string | number)[] = [];
+
+  if (reporterId) {
+    values.push(reporterId);
+    conditions.push(`reporter_id = $${values.length}`);
+  }
 
   if (status) {
     values.push(status);
@@ -189,6 +199,7 @@ export const listIncidents = async (
        longitude,
        address,
        reported_by,
+       reporter_id,
        people_affected,
        additional_information,
        created_at,
@@ -212,37 +223,10 @@ export const listIncidents = async (
   };
 };
 
-
 //Get specefic incident
-export const findIncidentById = async (id: string) => {
-  const result = await pool.query(
-    `SELECT
-       id,
-       reference_number,
-       type,
-       description,
-       priority,
-       status,
-       latitude,
-       longitude,
-       address,
-       reported_by,
-       people_affected,
-       additional_information,
-       created_at,
-       updated_at
-     FROM incidents
-     WHERE id = $1`,
-    [id],
-  );
-
-  return result.rows[0] ?? null;
-};
-
-//Find incident by reference number
-
-export const findIncidentByReferenceNumber = async (
-  referenceNumber: string,
+export const findIncidentById = async (
+  id: string,
+  reporterId?: string,
 ) => {
   const result = await pool.query(
     `SELECT
@@ -256,15 +240,82 @@ export const findIncidentByReferenceNumber = async (
        longitude,
        address,
        reported_by,
+       reporter_id,
        people_affected,
        additional_information,
        created_at,
        updated_at
      FROM incidents
-     WHERE reference_number = $1`,
-    [referenceNumber.trim().toUpperCase()],
+     WHERE id = $1
+       AND ($2::uuid IS NULL OR reporter_id = $2::uuid)`,
+    [id, reporterId ?? null],
+  );
+
+  return result.rows[0] ?? null;
+};
+
+//
+export const findIncidentByIdForReporter = async (
+  id: string,
+  reporterId: string,
+) => {
+  const result = await pool.query(
+    `SELECT
+       id,
+       reference_number,
+       type,
+       description,
+       priority,
+       status,
+       latitude,
+       longitude,
+       address,
+       reported_by,
+       reporter_id,
+       people_affected,
+       additional_information,
+       created_at,
+       updated_at
+     FROM incidents
+     WHERE id = $1
+       AND reporter_id = $2`,
+    [id, reporterId],
+  );
+
+  return result.rows[0] ?? null;
+};
+
+
+//Find incident by reference number
+export const findIncidentByReferenceNumber = async (
+  referenceNumber: string,
+  reporterId?: string,
+) => {
+  const result = await pool.query(
+    `SELECT
+       id,
+       reference_number,
+       type,
+       description,
+       priority,
+       status,
+       latitude,
+       longitude,
+       address,
+       reported_by,
+       reporter_id,
+       people_affected,
+       additional_information,
+       created_at,
+       updated_at
+     FROM incidents
+     WHERE reference_number = $1
+     AND ($2::uuid IS NULL OR reporter_id = $2::uuid)`,
+    [referenceNumber.trim().toUpperCase(), reporterId ?? null,],
   );
   //Uses $1 parameterisation to prevent SQL injection.
+  //$1 matches the incident reference number.
+//$2 matches the authenticated citizen's ID.
   return result.rows[0] ?? null;
 };
 

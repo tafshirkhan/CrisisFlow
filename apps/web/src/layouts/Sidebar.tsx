@@ -1,4 +1,4 @@
-
+import { useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
   Siren,
@@ -24,6 +24,8 @@ export default function Sidebar({
   onMenuSelect,
   onClose,
 }: SidebarProps) {
+  const navigate = useNavigate();
+
   return (
     <aside
       className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:translate-x-0 ${
@@ -68,7 +70,16 @@ export default function Sidebar({
             <button
               key={item.label}
               onClick={() => {
-                onMenuSelect(item.label);
+                if(item.label === 'My Dashboard'){
+                  navigate('/');
+                }
+                else if (item.label === 'Report Emergency') {
+                  navigate('/citizen/report');
+                } else if (item.label === 'My Reports') {
+                  navigate('/citizen/reports');
+                } else {
+                  onMenuSelect(item.label);
+                }
                 onClose();
               }}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${

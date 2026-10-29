@@ -11,6 +11,7 @@ import {
   InvalidStatusTransitionError,
   IncidentStatusConflictError,
   getIncidentStatusHistory,
+  getIncidentByIdForReporter,
 } from '../services/incident.service.js';
 
 import type {
@@ -25,7 +26,11 @@ export const createIncidentHandler = async (
   reply: FastifyReply,
 ) => {
   try {
-    const incident = await createIncident(request.body);
+    const incident = await createIncident({
+      ...request.body,
+      reporterId: request.user.sub,
+      reportedBy: undefined,
+    });
 
     return reply.code(201).send({
       message: 'Incident created successfully',
@@ -46,7 +51,15 @@ export const listIncidentsHandler = async (
   reply: FastifyReply,
 ) => {
   try {
-    const result = await listIncidents(request.query);
+    const reporterId =
+      request.user.role === 'CITIZEN'
+        ? request.user.sub
+        : undefined;
+
+    const result = await listIncidents({
+      ...request.query,
+      reporterId,
+    });
 
     return reply.code(200).send(result);
   } catch (error) {
@@ -65,11 +78,19 @@ export const getIncidentByIdHandler = async (
   reply: FastifyReply,
 ) => {
   try {
-    const incident = await getIncidentById(request.params.id);
+    const reporterId =
+      request.user.role === 'CITIZEN'
+        ? request.user.sub
+        : undefined;
+
+    const incident = await getIncidentById(
+      request.params.id,
+      reporterId,
+    );
 
     if (!incident) {
       return reply.code(404).send({
-        message: 'Oppsss, Incident deatails not found try again with accurate  information!!!',
+        message: 'Incident not found',
       });
     }
 
@@ -77,13 +98,14 @@ export const getIncidentByIdHandler = async (
       data: incident,
     });
   } catch (error) {
-    request.log.error(error, 'Failed to retrieve incident data, please try again or check your information details!!!');
+    request.log.error(error, 'Failed to retrieve incident');
 
     return reply.code(500).send({
-      message: 'Sorry, unable to retrieve incident try again in few mintues!!!',
+      message: 'Unable to retrieve incident',
     });
   }
 };
+
 
 //Inicdent by reference number
 export const getIncidentByReferenceNumberHandler = async (
@@ -93,22 +115,29 @@ export const getIncidentByReferenceNumberHandler = async (
   reply: FastifyReply,
 ) => {
   try {
+    const reporterId =
+      request.user.role === 'CITIZEN'
+        ? request.user.sub
+        : undefined;
+
     const incident = await getIncidentByReferenceNumber(
       request.params.referenceNumber,
+      reporterId,
     );
 
     if (!incident) {
       return reply.code(404).send({
-        message: 'Incident not found for this reference number',
+        message: 'Incident not found',
       });
     }
 
     return reply.code(200).send({ data: incident });
   } catch (error) {
-    request.log.error(
-      error,
-      'Failed to retrieve incident by reference number',
-    );
+    // request.log.error(
+    //   error,
+    //   'Failed to retrieve incident by reference number',
+    // );
+    console.error('[GET INCIDENT BY REFERENCE ERROR]', error);
 
     return reply.code(500).send({
       message: 'Unable to retrieve incident',
@@ -164,55 +193,86 @@ export const updateIncidentStatusHandler = async (
 };
 
 //POST: Cancle an incident
-export const cancelIncidentHandler = async(
-  request: FastifyRequest<{Params: {id: string}}>,
+export const cancelIncidentHandler = async (
+  request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,
 ) => {
-  try{
+  try {
+    if (request.user.role === 'CITIZEN') {
+      const ownedIncident = await getIncidentByIdForReporter(
+        request.params.id,
+        request.user.sub,
+      );
+
+      if (!ownedIncident) {
+        return reply.code(404).send({
+          message: 'Incident not found',
+        });
+      }
+
+      if (
+        ownedIncident.status === 'CANCELLED' ||
+        ownedIncident.status === 'RESOLVED'
+      ) {
+        return reply.code(422).send({
+          message: 'This incident can no longer be cancelled.',
+        });
+      }
+    }
+
     const incident = await updateIncidentStatus(
       request.params.id,
       'CANCELLED',
     );
+
     return reply.code(200).send({
       message: 'Incident cancelled successfully',
       data: incident,
     });
-  }catch(error){
-    if(error instanceof IncidentNotFoundError){
+  } catch (error) {
+    if (error instanceof IncidentNotFoundError) {
       return reply.code(404).send({
         message: 'Incident not found',
       });
     }
-    if(error instanceof InvalidStatusTransitionError){
+
+    if (error instanceof InvalidStatusTransitionError) {
       return reply.code(422).send({
         message: error.message,
         currentStatus: error.currentStatus,
         requestedStatus: error.requestedStatus,
       });
     }
-    if(error instanceof IncidentStatusConflictError){
+
+    if (error instanceof IncidentStatusConflictError) {
       return reply.code(409).send({
         message: error.message,
       });
     }
-    request.log.error(error, 'Failed to cancel incidnt please check & try again!!');
+
+    request.log.error(error, 'Failed to cancel incident');
 
     return reply.code(500).send({
-      message: 'Unable to proceed with your cancelation request!!'
+      message: 'Unable to cancel incident',
     });
-
   }
 };
 
 
 export const getIncidentStatusHistoryHandler = async (
-  request: FastifyRequest<{
-    Params: { id: string };
-  }>,
+  request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,
 ) => {
   try {
-    const incident = await getIncidentById(request.params.id);
+    const reporterId =
+      request.user.role === 'CITIZEN'
+        ? request.user.sub
+        : undefined;
+
+    const incident = await getIncidentById(
+      request.params.id,
+      reporterId,
+    );
 
     if (!incident) {
       return reply.code(404).send({
@@ -220,17 +280,23 @@ export const getIncidentStatusHistoryHandler = async (
       });
     }
 
-    const history = await getIncidentStatusHistory(request.params.id);
+    const history = await getIncidentStatusHistory(
+      request.params.id,
+    );
 
     return reply.code(200).send({
       count: history.length,
       history,
     });
   } catch (error) {
-    request.log.error(error, 'Failed to retrieve incident status history');
+    request.log.error(
+      error,
+      'Failed to retrieve incident status history',
+    );
 
     return reply.code(500).send({
       message: 'Unable to retrieve incident status history',
     });
   }
 };
+

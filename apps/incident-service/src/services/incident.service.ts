@@ -11,6 +11,7 @@ import {
   findIncidentByReferenceNumber as findIncidentRecordByReferenceNumber,
   updateIncidentStatus as updateIncidentStatusRecord,
   listIncidentStatusHistory as listIncidentStatusHistoryRecords,
+  findIncidentByIdForReporter as findIncidentByIdForReporters,
 } from '../repositories/incident.repository.js';
 
 import { INCIDENT_STATUS_TRANSITIONS } from '../constants/incident-transitions.constants.js';
@@ -33,17 +34,26 @@ export const createIncident = async (
 export const listIncidents = async (
   query: ListIncidentsQuery,
 ) => {
-  return listIncidentRecords(query);
+  const { reporterId, ...filters } = query;
+  return listIncidentRecords(filters, reporterId);
 };
 
-export const getIncidentById = async (id: string) => {
-  return findIncidentRecordById(id);
+export const getIncidentById = async (id: string, reporterId?: string,) => {
+  return findIncidentRecordById(id, reporterId);
+};
+
+export const getIncidentByIdForReporter = async (
+  id: string,
+  reporterId: string,
+) => {
+  return findIncidentByIdForReporters(id, reporterId);
 };
 
 export const getIncidentByReferenceNumber = async (
   referenceNumber: string,
+  reporterId?: string,
 ) => {
-  return findIncidentRecordByReferenceNumber(referenceNumber);
+  return findIncidentRecordByReferenceNumber(referenceNumber, reporterId,);
 };
 
 export class IncidentNotFoundError extends Error {

@@ -1,6 +1,6 @@
-
+import type { CreateIncidentBody, UpdateIncidentStatusBody, ListIncidentsQuery } from '../types/incident.types.js';
 import type { FastifyInstance } from 'fastify';
-
+import { authenticate } from '../services/authenticate.js';
 import {
   INCIDENT_PRIORITIES,
   INCIDENT_STATUSES,
@@ -35,9 +35,10 @@ export const incidentRoutes = async (
 ): Promise<void> => {
 
   // List all attachments belonging to an incident
-  app.get(
+  app.get<{ Params: { id: string } }>(
     '/:id/attachments',
     {
+      preHandler: authenticate,
       schema: {
         params: incidentIdValidationParamsSchema,
       },
@@ -46,9 +47,10 @@ export const incidentRoutes = async (
   );
 
   // Retrieve an attachment belonging to an incident
-  app.get(
+  app.get<{ Params: { id: string; attachmentId: string } }>(
     '/:id/attachments/:attachmentId',
     {
+      preHandler: authenticate,
       schema: {
         params: {
           type: 'object',
@@ -71,30 +73,35 @@ export const incidentRoutes = async (
   );
 
   // Upload an attachment to an incident
-  app.post(
+  app.post<{Params: {id: string}}>(
     '/:id/attachments',
     {
+      preHandler: authenticate,
       schema: {
         params: incidentIdValidationParamsSchema,
       },
     },
     uploadIncidentAttachmentHandler,
   );
-  //Status Update
-  app.patch(
+
+//Status Update
+app.patch<{ Params: { id: string }; Body: UpdateIncidentStatusBody }>(
     '/:id/status',
     {
+      preHandler: authenticate,
       schema: {
         params: incidentIdValidationParamsSchema,
         body: updateIncidentValidationStatusBodySchema,
       },
     },
     updateIncidentStatusHandler,
-  );
+);
+
  //Cancel 
- app.post(
+ app.post<{ Params: { id: string } }>(
   '/:id/cancel',
   {
+    preHandler: authenticate,
     schema:{
       params: incidentIdValidationParamsSchema,
     },
@@ -103,9 +110,10 @@ export const incidentRoutes = async (
  );
 
  
-app.get(
+app.get<{ Params: { id: string } }>(
   '/:id/status-history',
   {
+    preHandler: authenticate,
     schema: {
       params: incidentIdValidationParamsSchema,
     },
@@ -114,40 +122,44 @@ app.get(
 );
 
 
-  app.get(
+app.get<{ Params: { id: string } }>(
   '/:id',
   {
-  schema: {
-      params: incidentIdValidationParamsSchema,
-  },
-  },
-  getIncidentByIdHandler,
-  );
+    preHandler: authenticate,
+    schema: {
+        params: incidentIdValidationParamsSchema,
+    },
+    },
+    getIncidentByIdHandler,
+);
 
-  //Get by reference number
-  app.get(
+//Get by reference number
+app.get<{ Params: { referenceNumber: string } }>(
     '/reference/:referenceNumber',
     {
+      preHandler: authenticate,
       schema: {
         params: incidentReferenceValidationParamsSchema,
       },
     },
     getIncidentByReferenceNumberHandler,
-  );
+);
  
-  app.get(
+app.get<{ Querystring: ListIncidentsQuery }>(
     '/',
     {
+      preHandler: authenticate,
       schema: {
         querystring: listIncidentsValidationQuerySchema,
       },
     },
     listIncidentsHandler,
-  );
+);
   
-  app.post(
+app.post<{Body: CreateIncidentBody}>(
     '/',
     {
+      preHandler: authenticate,
       schema: {
         body: createIncidentValidationBodySchema,
       },

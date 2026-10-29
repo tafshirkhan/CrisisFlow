@@ -25,6 +25,16 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+api.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem('crisisflow_access_token');
+
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  return config;
+});
+
 export async function createIncident(
   incident: CreateIncidentRequest,
 ): Promise<CreatedIncident> {
@@ -55,6 +65,22 @@ export function getIncidentAttachmentUrl(
 ): string {
   return `${API_BASE_URL}/incidents/${incidentId}/attachments/${attachmentId}`;
 }
+
+
+//This function uses your existing api instance, so the Authorization: Bearer ... header is added automatically.
+export async function fetchIncidentAttachment(
+  incidentId: string,
+  attachmentId: string,
+): Promise<Blob> {
+  const response = await api.get<Blob>(
+    `/incidents/${encodeURIComponent(incidentId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    {
+      responseType: 'blob',
+    },
+  );
+  return response.data;
+}
+
 
 export async function listIncidentAttachments(
   incidentId: string,
