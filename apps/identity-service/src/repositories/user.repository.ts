@@ -11,10 +11,16 @@ export interface UserRecord {
   created_at: Date;
 }
 
+// export interface CreateUserInput {
+//   fullName: string;
+//   email: string;
+//   passwordHash: string;
+// }
 export interface CreateUserInput {
   fullName: string;
   email: string;
   passwordHash: string;
+  role?: 'CITIZEN' | 'DISPATCHER' | 'RESPONDER' | 'ADMIN';
 }
 
 export async function findUserByEmail(
@@ -34,10 +40,15 @@ export async function createUser(
   input: CreateUserInput,
 ): Promise<UserRecord> {
   const result = await pool.query<UserRecord>(
-    `INSERT INTO users (full_name, email, password_hash)
-     VALUES ($1, $2, $3)
+    `INSERT INTO users (full_name, email, password_hash, role)
+     VALUES ($1, $2, $3, $4)
      RETURNING id, full_name, email, password_hash, role, is_active, created_at`,
-    [input.fullName, input.email, input.passwordHash],
+    [
+      input.fullName,
+      input.email,
+      input.passwordHash,
+      input.role ?? 'CITIZEN',
+    ],
   );
 
   return result.rows[0];

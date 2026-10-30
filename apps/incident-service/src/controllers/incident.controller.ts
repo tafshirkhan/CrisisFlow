@@ -154,6 +154,15 @@ export const updateIncidentStatusHandler = async (
   reply: FastifyReply,
 ) => {
   try {
+    // Only dispatchers and admins can update incident status.
+    if (
+      request.user.role !== 'DISPATCHER' &&
+      request.user.role !== 'ADMIN'
+    ) {
+      return reply.code(403).send({
+        message: 'You do not have permission to update incident status.',
+      });
+    }
     const incident = await updateIncidentStatus(
       request.params.id,
       request.body.status,
@@ -198,6 +207,15 @@ export const cancelIncidentHandler = async (
   reply: FastifyReply,
 ) => {
   try {
+    if (
+      request.user.role !== 'CITIZEN' &&
+      request.user.role !== 'DISPATCHER' &&
+      request.user.role !== 'ADMIN'
+    ) {
+      return reply.code(403).send({
+        message: 'You do not have permission to cancel incidents.',
+      });
+    }
     if (request.user.role === 'CITIZEN') {
       const ownedIncident = await getIncidentByIdForReporter(
         request.params.id,

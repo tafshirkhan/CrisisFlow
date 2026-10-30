@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import { authRoutes } from './routes/auth.routes.js';
+import { internalRoutes } from './routes/internal.routes.js';
 
 export const buildApp = () => {
   const app = Fastify({
@@ -33,6 +34,10 @@ export const buildApp = () => {
 
   app.register(authRoutes, {
     prefix: '/api/v1/auth',
+  });
+  
+  app.register(internalRoutes, {
+    prefix: '/api/v1/internal',
   });
 
   app.get('/health', async () => ({
