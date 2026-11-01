@@ -1,10 +1,12 @@
 
 import type { FastifyPluginAsync } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
-import { findUserById } from '../repositories/user.repository.js';
+import { findUserById, findActiveResponders } from '../repositories/user.repository.js';
 
 export const internalRoutes: FastifyPluginAsync = async (app) => {
-  app.get<{ Params: { userId: string } }>(
+  //assignment-eligibility route
+  app.get<{ Params: { userId: string } }>
+  (
     '/users/:userId/assignment-eligibility',
     async (request, reply) => {
       const configuredKey = process.env.IDENTITY_SERVICE_API_KEY;
@@ -63,6 +65,50 @@ export const internalRoutes: FastifyPluginAsync = async (app) => {
 
         return reply.code(500).send({
           message: 'Unable to validate responder.',
+        });
+      }
+    },
+  );
+
+  //This routes reuses the existing internal API-key protection and returns only the active responder list.
+  app.get
+  (
+  '/responders',
+    async (request, reply) => {
+      const configuredKey = process.env.IDENTITY_SERVICE_API_KEY;
+      const providedKey = request.headers['x-internal-api-key'];
+
+      if (!configuredKey) {
+        return reply.code(503).send({
+          message: 'Internal service authentication is not configured.',
+        });
+      }
+
+      if (
+        typeof providedKey !== 'string' ||
+        Buffer.byteLength(providedKey) !== Buffer.byteLength(configuredKey) ||
+        !timingSafeEqual(
+          Buffer.from(providedKey),
+          Buffer.from(configuredKey),
+        )
+      ) {
+        return reply.code(401).send({
+          message: 'Internal service authentication failed.',
+        });
+      }
+
+      try {
+        const responders = await findActiveResponders();
+
+        return reply.code(200).send({
+          count: responders.length,
+          responders,
+        });
+      } catch (error) {
+        request.log.error(error, 'Failed to retrieve active responders');
+
+        return reply.code(500).send({
+          message: 'Unable to retrieve active responders.',
         });
       }
     },

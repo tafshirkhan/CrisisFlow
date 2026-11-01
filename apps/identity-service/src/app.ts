@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import { authRoutes } from './routes/auth.routes.js';
 import { internalRoutes } from './routes/internal.routes.js';
+import { createHash } from 'node:crypto';
 
 export const buildApp = () => {
   const app = Fastify({
@@ -11,6 +12,13 @@ export const buildApp = () => {
   });
 
   const jwtSecret = process.env.JWT_SECRET;
+  console.log(
+  'JWT_SECRET fingerprint:',
+  createHash('sha256')
+    .update(jwtSecret ?? '')
+    .digest('hex')
+    .slice(0, 12),
+);
 
   if (!jwtSecret || jwtSecret.length < 32) {
     throw new Error(

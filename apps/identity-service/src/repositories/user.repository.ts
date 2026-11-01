@@ -1,27 +1,17 @@
 
 import { pool } from '../config/database.js';
+import type {
+  CreateUserInput,
+  ResponderRecord,
+  UserRecord,
+} from '../types/user.types.js';
 
-export interface UserRecord {
-  id: string;
-  full_name: string;
-  email: string;
-  password_hash: string;
-  role: 'CITIZEN' | 'DISPATCHER' | 'RESPONDER' | 'ADMIN';
-  is_active: boolean;
-  created_at: Date;
-}
 
 // export interface CreateUserInput {
 //   fullName: string;
 //   email: string;
 //   passwordHash: string;
 // }
-export interface CreateUserInput {
-  fullName: string;
-  email: string;
-  passwordHash: string;
-  role?: 'CITIZEN' | 'DISPATCHER' | 'RESPONDER' | 'ADMIN';
-}
 
 export async function findUserByEmail(
   email: string,
@@ -54,7 +44,6 @@ export async function createUser(
   return result.rows[0];
 }
 
-
 export async function findUserById(
   id: string,
 ): Promise<UserRecord | undefined> {
@@ -66,4 +55,16 @@ export async function findUserById(
   );
 
   return result.rows[0];
+}
+
+export async function findActiveResponders(): Promise<ResponderRecord[]> {
+  const result = await pool.query<ResponderRecord>(
+    `SELECT id, full_name
+     FROM users
+     WHERE role = 'RESPONDER'
+       AND is_active = TRUE
+     ORDER BY full_name ASC, id ASC`,
+  );
+
+  return result.rows;
 }

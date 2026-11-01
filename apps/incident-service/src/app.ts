@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import jwt from '@fastify/jwt';
+import { createHash } from 'node:crypto';
 
 import { incidentRoutes } from './routes/incident.routes.js';
 
@@ -12,6 +13,13 @@ export const buildApp = () => {
   });
 
   const jwtSecret = process.env.JWT_SECRET;
+  console.log(
+  'JWT_SECRET fingerprint:',
+  createHash('sha256')
+    .update(jwtSecret ?? '')
+    .digest('hex')
+    .slice(0, 12),
+);
 
   if (!jwtSecret || jwtSecret.length < 32) {
     throw new Error(
@@ -30,9 +38,6 @@ export const buildApp = () => {
   // Verify JWT tokens issued by the Identity Service.
   app.register(jwt, {
     secret: jwtSecret,
-    verify: {
-      allowedIss: undefined,
-    },
   });
 
   // Enable multipart file uploads.
