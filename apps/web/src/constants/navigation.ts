@@ -9,6 +9,7 @@ import {
   Settings,
   Siren,
   Users,
+  UserPlus,
 } from 'lucide-react';
 
 import type { NavigationItem, Role } from '../types/app.types';
@@ -24,6 +25,7 @@ export const roleMenus: Record<Role, NavigationItem[]> = {
   Dispatcher: [
     { label: 'Overview', icon: LayoutDashboard },
     { label: 'All Incidents', icon: Siren },
+    { label: 'Assign Responder', icon: UserPlus },
     { label: 'Live Operations', icon: Radio },
     { label: 'Response Teams', icon: Users },
     { label: 'Reports', icon: FileText },

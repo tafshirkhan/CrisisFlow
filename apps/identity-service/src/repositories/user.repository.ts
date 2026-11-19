@@ -59,11 +59,32 @@ export async function findUserById(
 
 export async function findActiveResponders(): Promise<ResponderRecord[]> {
   const result = await pool.query<ResponderRecord>(
-    `SELECT id, full_name
-     FROM users
-     WHERE role = 'RESPONDER'
-       AND is_active = TRUE
-     ORDER BY full_name ASC, id ASC`,
+    `SELECT
+        u.id,
+        u.full_name,
+        json_build_object(
+          'latitude', rp.latitude,
+          'longitude', rp.longitude,
+          'is_available', COALESCE(rp.is_available, FALSE)
+        ) AS profile,
+        COALESCE(
+          json_agg(rs.skill) FILTER (WHERE rs.skill IS NOT NULL),
+          '[]'::json
+        ) AS skills
+     FROM users u
+     LEFT JOIN responder_profiles rp
+       ON rp.user_id = u.id
+     LEFT JOIN responder_skills rs
+       ON rs.responder_id = u.id
+     WHERE u.role = 'RESPONDER'
+       AND u.is_active = TRUE
+     GROUP BY
+       u.id,
+       u.full_name,
+       rp.latitude,
+       rp.longitude,
+       rp.is_available
+     ORDER BY u.full_name ASC, u.id ASC`,
   );
 
   return result.rows;

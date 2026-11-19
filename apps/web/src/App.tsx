@@ -20,6 +20,7 @@ import CitizenReportPage from './features/incidents/pages/CitizenReportPage';
 import CitizenTrackingPage from './features/incidents/pages/CitizenTrackingPage';
 import LoginPage from './features/auth/pages/LoginPage';
 import RegisterPage from './features/auth/pages/RegisterPage';
+import AssignmentForm from './features/assignments/components/AssignmentForm';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -66,7 +67,9 @@ function Dashboard() {
         <CitizenReportPage />
       ) : location.pathname === '/citizen/reports' ? (
         <CitizenTrackingPage />
-      ) : (
+      ) : activeMenu === 'Assign Responder' && role === 'Dispatcher' ? (
+        <AssignmentForm/>
+      ): (
         <DashboardPage
           role={role}
           onMenuSelect={(menu) => {

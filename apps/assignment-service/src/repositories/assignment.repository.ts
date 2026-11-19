@@ -163,3 +163,38 @@ export const findResponderWorkload = async (): Promise<
   const result = await pool.query<ResponderWorkload>(query);
   return result.rows;
 };
+
+// Retrieves all active assignments for a specific responder.
+export const findActiveAssignmentsByResponderId = async (
+  responderId: string,
+): Promise<Assignment[]> => {
+  const query = `
+    SELECT *
+    FROM assignments
+    WHERE responder_id = $1
+      AND status = 'ACTIVE'
+    ORDER BY assigned_at DESC;
+  `;
+
+  const result = await pool.query<Assignment>(
+    query,
+    [responderId],
+  );
+
+  return result.rows;
+};
+
+
+//Retrieves only active assignments.
+//Returns incident IDs. Excludes completed, cancelled and reassigned assignments.
+export const findIncidentIdsWithActiveAssignments = async (): Promise<string[]> => {
+  const query = `
+    SELECT DISTINCT incident_id
+    FROM assignments
+    WHERE status = 'ACTIVE';
+  `;
+
+  const result = await pool.query<{ incident_id: string }>(query);
+
+  return result.rows.map((row) => row.incident_id);
+};

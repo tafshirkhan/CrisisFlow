@@ -5,7 +5,11 @@ import { createAssignmentController,
          getAssignmentByIdController,
          completeAssignmentController,
         reassignAssignmentController,
-      getResponderWorkloadController } from '../controllers/assignment.controller.js';
+        getResponderWorkloadController,
+        getActiveAssignmentsByResponderIdController,
+        getIncidentsWithActiveAssignmentsController,
+        getResponderRecommendationsController, } from '../controllers/assignment.controller.js';
+
 import { authenticate } from '../services/authenticate.js';
 import { authorize } from '../services/authorize.js';
 
@@ -50,6 +54,45 @@ export const assignmentRoutes = async (
       ],
     },
     getResponderWorkloadController,
+  );
+
+   // Retrieve weighted responder recommendations for a specific incident.
+  // Only authenticated DISPATCHER or ADMIN users can access this route.
+ // GET /api/v1/assignments/incidents/:incidentId/recommendations
+  app.get<{ Params: { incidentId: string } }>(
+    '/incidents/:incidentId/recommendations',
+    {
+      preHandler: [
+        authenticate,
+        authorize('DISPATCHER', 'ADMIN'),
+      ],
+    },
+    getResponderRecommendationsController,
+  );
+
+  // Retrieve active assignments for a specific responder.
+  // Only authenticated DISPATCHER or ADMIN users can access this route.
+  app.get<{ Params: { responderId: string } }>(
+    '/responders/:responderId/active',
+    {
+      preHandler: [
+        authenticate,
+        authorize('DISPATCHER', 'ADMIN'),
+      ],
+    },
+    getActiveAssignmentsByResponderIdController,
+  );
+
+  // Retrieve incident IDs that already have active assignments.
+  app.get(
+    '/active-incidents',
+    {
+      preHandler: [
+        authenticate,
+        authorize('DISPATCHER', 'ADMIN'),
+      ],
+    },
+    getIncidentsWithActiveAssignmentsController,
   );
 
   app.get<{Params: {assignmentId: string;};}>

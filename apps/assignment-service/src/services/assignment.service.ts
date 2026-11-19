@@ -4,17 +4,22 @@ import {
   findAssignmentById,
   completeAssignment as completeAssignmentRecord,
   reassignAssignment as reassignAssignmentRecord,
-  findResponderWorkload
+  findResponderWorkload,
+  findActiveAssignmentsByResponderId,
+  findIncidentIdsWithActiveAssignments
 } from '../repositories/assignment.repository.js';
 
 import { findIncidentById } from './incident-client.service.js';
 import { isEligibleResponder, findActiveResponders  } from './identity-client.service.js';
+import { calculateRecommendationScore } from '../utils/recommendation.utils.js';
+
 
 import type {
   Assignment,
   CreateAssignmentInput,
   ReassignAssignmentInput,
-  ResponderWorkload
+  ResponderWorkload,
+  ResponderRecommendation
 } from '../types/assignment.types.js';
 
 export const createAssignment = async (
@@ -99,6 +104,7 @@ export const reassignAssignment = async (
   return assignment;
 };
 
+
 export const getResponderWorkload = async (): Promise<
   ResponderWorkload[]
 > => {
@@ -116,7 +122,110 @@ export const getResponderWorkload = async (): Promise<
 
   return responders.map((responder) => ({
     responder_id: responder.id,
+    responder_name: responder.full_name,
     active_assignments:
       workloadByResponderId.get(responder.id) ?? 0,
+    is_available: responder.profile.is_available,
+    latitude: responder.profile.latitude,
+    longitude: responder.profile.longitude,
+    skills: responder.skills,
   }));
+};
+
+//Retrieves the selected incident.
+//Fetches responder profiles, skills and workloads.
+//Removes unavailable responders.
+//Calculates the weighted score for each remaining responder.
+//Sorts responders by their total score.
+export const getResponderRecommendations = async (
+  incidentId: string,
+  accessToken: string,
+): Promise<ResponderRecommendation[]> => {
+  const incident = await findIncidentById(incidentId, accessToken);
+
+  if (!incident) {
+    throw new Error('Incident not found.');
+  }
+
+  const responders = await getResponderWorkload();
+
+  const availableResponders = responders.filter(
+    (responder) => responder.is_available,
+  );
+
+  const recommendations = availableResponders.map((responder) => {
+    const score = calculateRecommendationScore({
+      incident: {
+        type: incident.type,
+        priority: incident.priority,
+        latitude: incident.latitude,
+        longitude: incident.longitude,
+      },
+      responder: {
+        skills: responder.skills,
+        active_assignments: responder.active_assignments,
+        latitude: responder.latitude,
+        longitude: responder.longitude,
+      },
+    });
+
+    return {
+      responder_id: responder.responder_id,
+      responder_name: responder.responder_name,
+      total_score: score.total_score,
+      recommendation_reason: [
+        score.score_breakdown.skill_match > 0
+          ? `Matches the ${incident.type} incident skill`
+          : 'No direct incident skill match',
+
+        responder.active_assignments === 0
+          ? 'No active assignments'
+          : responder.active_assignments === 1
+            ? 'Only one active assignment'
+            : `${responder.active_assignments} active assignments`,
+
+        score.distance_km !== null
+          ? `${score.distance_km} km from the incident`
+          : 'Location information unavailable',
+      ].join(', '),
+      score_breakdown: score.score_breakdown,
+      distance_km: score.distance_km,
+      active_assignments: responder.active_assignments,
+      skills: responder.skills,
+      is_available: responder.is_available,
+    };
+  });
+
+  return recommendations.sort(
+    (a, b) => b.total_score - a.total_score,
+  );
+};
+
+//This retrieves the active assignments and get each one with its corresponding incident details.
+export const getActiveAssignmentsByResponderId = async (
+  responderId: string,
+  accessToken: string,
+) => {
+  const assignments =
+    await findActiveAssignmentsByResponderId(responderId);
+
+  const assignmentsWithIncidents = await Promise.all(
+    assignments.map(async (assignment) => {
+      const incident = await findIncidentById(
+        assignment.incident_id,
+        accessToken,
+      );
+
+      return {
+        ...assignment,
+        incident,
+      };
+    }),
+  );
+
+  return assignmentsWithIncidents;
+};
+
+export const getIncidentsWithActiveAssignments = async (): Promise<string[]> => {
+  return await findIncidentIdsWithActiveAssignments();
 };

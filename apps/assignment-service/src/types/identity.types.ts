@@ -12,5 +12,11 @@ export interface ActiveRespondersResponse {
   responders: {
     id: string;
     full_name: string;
+    profile: {
+      latitude: number | null;
+      longitude: number | null;
+      is_available: boolean;
+    };
+    skills: string[];
   }[];
 }

@@ -21,7 +21,15 @@ export interface CreateUserInput {
   role?: UserRole;
 }
 
+export interface ResponderProfile {
+  latitude: number | null;
+  longitude: number | null;
+  is_available: boolean;
+}
+
 export interface ResponderRecord {
   id: string;
   full_name: string;
+  profile: ResponderProfile;
+  skills: string[];
 }

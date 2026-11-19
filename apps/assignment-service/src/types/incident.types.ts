@@ -4,4 +4,6 @@ export interface Incident {
   type: string;
   priority: string;
   status: string;
+  latitude: number | null;
+  longitude: number | null;
 }

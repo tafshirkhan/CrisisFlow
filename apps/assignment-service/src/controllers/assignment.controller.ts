@@ -3,7 +3,12 @@ import type {
   FastifyRequest,
 } from 'fastify';
 
-import { createAssignment, completeAssignment, reassignAssignment, getResponderWorkload } from '../services/assignment.service.js';
+import { createAssignment, 
+         completeAssignment, reassignAssignment, 
+         getResponderWorkload, 
+         getActiveAssignmentsByResponderId,
+        getIncidentsWithActiveAssignments,
+        getResponderRecommendations } from '../services/assignment.service.js';
 import { createAssignmentSchema } from '../validation-schemas/assignment.schema.js';
 import { findAssignmentsByIncidentId, findAssignmentById } from '../repositories/assignment.repository.js';
 import { reassignAssignmentSchema } from '../validation-schemas/reassignment.schema.js';
@@ -243,6 +248,97 @@ export const getResponderWorkloadController = async (
 
     return reply.code(500).send({
       message: 'Unable to retrieve responder workload.',
+    });
+  }
+};
+
+export const getActiveAssignmentsByResponderIdController = async (
+  request: FastifyRequest<{
+    Params: {
+      responderId: string;
+    };
+  }>,
+  reply: FastifyReply,
+) => {
+  const { responderId } = request.params;
+
+  try {
+    const accessToken = request.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
+
+    const assignments =
+      await getActiveAssignmentsByResponderId(
+        responderId,
+        accessToken,
+      );
+
+    return reply.code(200).send({
+      responderId,
+      count: assignments.length,
+      assignments,
+    });
+  } catch (error) {
+    console.error(
+      'Get responder active assignments failed:',
+      error,
+    );
+
+    return reply.code(500).send({
+      message: 'Unable to retrieve responder assignments.',
+    });
+  }
+};
+
+export const getIncidentsWithActiveAssignmentsController = async (
+  _request: FastifyRequest,
+  reply: FastifyReply,
+) => {
+  try {
+    const incidentIds = await getIncidentsWithActiveAssignments();
+
+    return reply.code(200).send({
+      count: incidentIds.length,
+      incidentIds,
+    });
+  } catch (error) {
+    console.error('Get active assignment incidents failed:', error);
+
+    return reply.code(500).send({
+      message: 'Unable to retrieve incidents with active assignments.',
+    });
+  }
+};
+
+export const getResponderRecommendationsController = async (
+  request: FastifyRequest<{ Params: { incidentId: string } }>,
+  reply: FastifyReply,
+) => {
+  const { incidentId } = request.params;
+
+  try {
+    const accessToken =
+      request.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
+
+    const responders = await getResponderRecommendations(
+      incidentId,
+      accessToken,
+    );
+
+    return reply.code(200).send({
+      incidentId,
+      count: responders.length,
+      responders,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Incident not found.') {
+      return reply.code(404).send({
+        message: error.message,
+      });
+    }
+
+    console.error('Get responder recommendations failed:', error);
+
+    return reply.code(500).send({
+      message: 'Unable to retrieve responder recommendations.',
     });
   }
 };
